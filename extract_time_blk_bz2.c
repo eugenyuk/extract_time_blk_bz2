@@ -22,7 +22,7 @@
 #define FIRST_BLOCK_POS 32
 
 // debug switch
-#define DEBUG 0
+#define DEBUG 1
 
 // macro for debug printing
 #define debug_print(fmt, ...) \
