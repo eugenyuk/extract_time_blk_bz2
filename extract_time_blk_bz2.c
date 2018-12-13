@@ -1,4 +1,4 @@
-// author: ievgen.ivaniuk@portaone.com
+// author: Eugene Ivanyuk (eugene.ivanyuk@gmail.com)
 //
 // Legend:
 // dt - abbreviation for datetime
