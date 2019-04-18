@@ -171,16 +171,18 @@ printf("%u\n", bits);
    are done through this function.  All reads are big endian */
 unsigned int get_bits( bunzip_data *bd, char bits_wanted )
 {
-   unsigned int bits = 0;
+    unsigned int bits = 0;
 
-   /* If we need to get more data from the byte buffer, do so.  (Loop getting
+    //printf("LSEEK POS = %lu\n", lseek(bd->in_fd, 0, SEEK_CUR ));
+
+    /* If we need to get more data from the byte buffer, do so.  (Loop getting
      one byte at a time to enforce endianness and avoid unaligned access.) */
     while ( bd->inbufBitCount < bits_wanted )
     {
         /* If we need to read more data from file into byte buffer, do so */
         if ( bd->inbufPos == bd->inbufCount )
         {
-            if ( ( bd->inbufCount = read( bd->in_fd, bd->inbuf, IOBUF_SIZE ) ) <= 0 )
+            if ((bd->inbufCount = read(bd->in_fd, bd->inbuf, IOBUF_SIZE)) <= 0)
                 longjmp( bd->jmpbuf, RETVAL_UNEXPECTED_INPUT_EOF );
             // james@jamestaylor.org: track position
             bd->position += bd->inbufCount;
@@ -417,6 +419,7 @@ int get_next_block( bunzip_data *bd )
         };
         bd->inbufBitCount -= hufGroup->maxLen;
         j = ( bd->inbufBits >> bd->inbufBitCount ) & ( ( 1 << hufGroup->maxLen ) - 1 );
+
 got_huff_bits:
         /* Figure how how many bits are in next symbol and unget extras */
         i = hufGroup->minLen;
@@ -535,7 +538,7 @@ got_huff_bits:
    are ignored, data is written to out_fd and return is RETVAL_OK or error.
 */
 
-extern int read_bunzip( bunzip_data *bd, char *outbuf, int len )
+int read_bunzip( bunzip_data *bd, char *outbuf, int len )
 {
     const unsigned int *dbuf;
     int pos, current, previous, gotcount;
@@ -643,7 +646,7 @@ int init_block( bunzip_data *bd )
 /* Allocate the structure, read file header.  If in_fd==-1, inbuf must contain
    a complete bunzip file (len bytes long).  If in_fd!=-1, inbuf and len are
    ignored, and data is read from file handle into temporary buffer. */
-extern int start_bunzip( bunzip_data **bdp, int in_fd, char *inbuf, int len )
+int start_bunzip( bunzip_data **bdp, int in_fd, char *inbuf, int len )
 {
     bunzip_data *bd;
     unsigned int i, j, c;

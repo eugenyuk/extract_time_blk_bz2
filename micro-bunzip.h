@@ -60,9 +60,8 @@ typedef struct
     struct group_data groups[MAX_GROUPS]; /* huffman coding tables */
     /* For I/O error handling */
     jmp_buf jmpbuf;
-    long cur_file_offset; // current file offset (lseek())
-}
-bunzip_data;
+    off_t cur_file_offset; // current file offset (lseek()) in bytes
+} bunzip_data;
 
 static char * const bunzip_errors[] =
     {
@@ -73,6 +72,11 @@ static char * const bunzip_errors[] =
 
 /* ---- Forward declarations for micro-bzip.c ---------------------------- */
 
-extern int get_next_block( bunzip_data *bd );
+// Declare the functions that are run in extract_time_blk_bz2.c but defined in
+// micro-bunzip.c
+int get_next_block(bunzip_data *);
+int start_bunzip(bunzip_data **, int, char *, int);
+unsigned int get_bits(bunzip_data *, char);
+int read_bunzip(bunzip_data *, char *, int);
 
 #endif
