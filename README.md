@@ -25,3 +25,6 @@ Datatime substring in a log should be at the beginning of a string. For ex.:
 
 `2018-12-02T21:38:30 text text text ...`
 
+
+
+
