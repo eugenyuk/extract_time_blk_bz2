@@ -10,7 +10,7 @@ I've added a possibility to extract only that bz2 blocks, which contains a data 
 
 
 ### How to use a tool:
-`extract_time_blk --from='' --to='' --file=/full/path/to/file.bz2`
+`extract_time_blk_bz2 --from="" --to="" --file=/full/path/to/file.bz2`
 
 Where supported from/to datetime formats are:
 
