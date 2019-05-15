@@ -128,7 +128,8 @@ int main(int argc, char *argv[])
     }
 
 // Open an input bz2 file
-    if ((ifd = open(opt_input_file ,O_RDONLY)) < 0) {
+    if ((ifd = open(opt_input_file ,O_RDONLY)) < 0)
+    {
 	    //printf("main(), ERROR: open(opt_input_file ,O_RDONLY) < 0\n");
 	    error_print("Can't open the file %s\n%s\n",
                     opt_input_file, strerror(errno));
@@ -136,7 +137,8 @@ int main(int argc, char *argv[])
     }
 
 // Check if the input file is in bzip2 format, prepare bd structure for work.
-    if (status = start_bunzip(&bd, ifd, 0, 0)) {
+    if (status = start_bunzip(&bd, ifd, 0, 0))
+    {
         error_print("start_bunzip() returned: %s\n", bunzip_errors[-status]);
 	    exit(EXIT_FAILURE);
     }
@@ -164,7 +166,8 @@ int main(int argc, char *argv[])
     opt_to_time_t = convert_dt_str_to_epoch(opt_to, dt_fmt);
 
 // Check if opt_f >= opt_to
-    if ( opt_from_time_t >= opt_to_time_t ) {
+    if ( opt_from_time_t >= opt_to_time_t )
+    {
         error_print("%s\n", "Value of --from shouldn't be >= value of --to");
         exit(EXIT_FAILURE);
     }
@@ -238,7 +241,8 @@ int main(int argc, char *argv[])
     //debug_print("lseek position AFTER opt_from_bin_search = %lu", 
     //             lseek(bd->in_fd, 0, SEEK_CUR ));
 
-    if (opt_from_pos + bd->cur_file_offset * 8 != FIRST_BLK_POS) {
+    if (opt_from_pos + bd->cur_file_offset * 8 != FIRST_BLK_POS)
+    {
         // Search for the very first block where opt_f is located
         opt_from_pos = opt_from_first_blk_search(opt_from_pos, bd, opt_f);
         //debug_print("The very first opt_from_pos = %llu", 
@@ -296,7 +300,8 @@ int main(int argc, char *argv[])
 
     // Check if opt_to exists in a whole block
     status = seek_dt_str_in_blk(cur_rel_bz2_blk_pos, bd, opt_to, &is_dt_str_found);
-    if (status) {
+    if (status) 
+    {
 	    error_print("seek_dt_str_in_blk() returned %s", bunzip_errors[-status]);
 	    exit(EXIT_FAILURE);
     }
@@ -304,7 +309,8 @@ int main(int argc, char *argv[])
     //printf("%s(): is_dt_str_found = %d\n", __func__, is_dt_str_found);
 
 // Find the last block where opt_to exists
-    while (is_dt_str_found) {
+    while (is_dt_str_found) 
+    {
         debug_print("opt_to value %s was found in the block %llu", 
                     opt_to, cur_rel_bz2_blk_pos + bd->cur_file_offset * 8);
 	    bd->cur_file_offset = lseek(bd->in_fd, bd->cur_file_offset + cur_rel_bz2_blk_pos / 8 + 1, SEEK_SET);
@@ -405,7 +411,8 @@ unsigned long long opt_from_first_blk_search(unsigned long long opt_from_pos,
 
         // Check if opt_f exists in the current block
         status = seek_dt_str_in_blk(cur_rel_bz2_blk_pos, bd, opt_f, &is_dt_str_found);
-        if (status) {
+        if (status)
+        {
             error_print("seek_dt_str_in_blk(ERROR): %s", bunzip_errors[-status]);
             exit(EXIT_FAILURE);
         }
@@ -420,7 +427,8 @@ unsigned long long opt_from_first_blk_search(unsigned long long opt_from_pos,
 
 	        // If current block is the first block (located in FIRST_BLOCK_POSnd bit) then stop searching for a previous block
 	        debug_print("cur_abs_bz2_blk_pos = %lu", cur_abs_bz2_blk_pos);
-	        if (cur_abs_bz2_blk_pos == FIRST_BLK_POS) {
+	        if (cur_abs_bz2_blk_pos == FIRST_BLK_POS)
+            {
                 prev_file_offset = 4;
                 break;
 	        }
@@ -450,7 +458,8 @@ const char * def_dt_fmt(const char * dt_str)
     
     // 2. check if opt_f, opt_to strings correspond to one of supported
     // datetime formats
-    for (short i = 0; i < dt_fmts_arr_size; i++) {
+    for (short i = 0; i < dt_fmts_arr_size; i++)
+    {
         if (strptime(dt_str, DATETIME_FORMATS[i], &dt_tm) != NULL)
             return DATETIME_FORMATS[i];
 	}
@@ -537,11 +546,13 @@ unsigned long opt_from_bin_search(off_t low, off_t high,
 	    //printf("%s: opt_from_time_t(%lu) - first_dt_str_in_outbuf_time_t(%lu) = %lu\n", 
         //  __func__, opt_from_time_t, first_dt_str_in_outbuf_time_t, 
         //  opt_from_time_t - first_dt_str_in_outbuf_time_t);
-	    if ( opt_from_time_t > first_dt_str_in_outbuf_time_t ) {
+	    if ( opt_from_time_t > first_dt_str_in_outbuf_time_t )
+        {
             debug_print("opt_f (%s) > first_dt_str_in_outbuf (%s)", 
                         opt_f, first_dt_str_in_outbuf);
 
-            if ( opt_from_time_t <= last_dt_str_in_blk_time_t ) {
+            if ( opt_from_time_t <= last_dt_str_in_blk_time_t )
+            {
                 // Break the loop and return the block position.
                 debug_print("opt_f (%s) <= last_dt_str_in_blk (%s)", 
                             opt_f, last_dt_str_in_blk);
@@ -558,7 +569,9 @@ unsigned long opt_from_bin_search(off_t low, off_t high,
             //low = mid + mid_pos / 8 + 1;
             low = mid + 1;
 
-	    } else if (opt_from_time_t < first_dt_str_in_outbuf_time_t) {
+	    } 
+        else if (opt_from_time_t < first_dt_str_in_outbuf_time_t)
+        {
 
             debug_print("opt_f (%s) < first_dt_str_in_outbuf (%s)\n", 
                         opt_f, first_dt_str_in_outbuf);
@@ -569,7 +582,9 @@ unsigned long opt_from_bin_search(off_t low, off_t high,
 	        // high = mid + mid_pos / 8 - 1;
 	        high = mid - 1;
 
-	    } else {
+	    }
+        else
+        {
             // If opt_f == first_dt_str_in_outbuf_time_t then break the loop and
             // return current block position
 	        debug_print("opt_f (%s) == first_dt_str_in_outbuf (%s)", 
@@ -596,11 +611,13 @@ unsigned long opt_from_bin_search(off_t low, off_t high,
     return mid_pos;
 }
 
-off_t lseek_set(bunzip_data *bd, off_t offset) {
+off_t lseek_set(bunzip_data *bd, off_t offset)
+{
     off_t result = 0;
 
     result = lseek(bd->in_fd, offset, SEEK_SET);
-    if (result != offset) {
+    if (result != offset)
+    {
         error_print("lseek(bd->in_fd (%d), offset (%jd), SEEK_SET) returned %jd,"
 	       	        " which is not equal to offset",
                     bd->in_fd, (intmax_t)offset, (intmax_t)result);
@@ -658,7 +675,8 @@ int uncompress_first_buf_of_blk(unsigned long pos, bunzip_data *bd, char *obuf)
     seek_bits( bd, pos );
 
     /* Fill the decode buffer for the block */
-    if ((status = get_next_block( bd ))) {
+    if ((status = get_next_block( bd )))
+    {
         error_print("get_next_block() returned %d, bunzip_errors[-status]",
                      status);
         exit(EXIT_FAILURE);
@@ -675,13 +693,15 @@ int uncompress_first_buf_of_blk(unsigned long pos, bunzip_data *bd, char *obuf)
 
     bd->cur_file_offset = lseek(bd->in_fd, bd->cur_file_offset, SEEK_SET);
 
-    if (gotcount < 0) {
+    if (gotcount < 0)
+    {
         status = gotcount;
 	    error_print("read_bunzip() returned %d, %s",
             gotcount, bunzip_errors[-status]);
 	    exit(EXIT_FAILURE);
     }
-    else if (gotcount == 0) {
+    else if (gotcount == 0)
+    {
 	    status = gotcount;
         error_print("read_bunzip() returned %d, %s", 
             gotcount, bunzip_errors[-status]);
@@ -709,7 +729,8 @@ int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *t
     seek_bits( bd, pos );
 
     /* Fill the decode buffer for the block */
-    if ((status = get_next_block( bd ))) {
+    if ((status = get_next_block( bd )))
+    {
         printf("%s: ERROR. get_next_block() returned %d, bunzip_errors[-status]\n", __func__, status);
         exit(EXIT_FAILURE);
     }
@@ -725,43 +746,47 @@ int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *t
         /* Decompress the first buffer of block */
         gotcount = read_bunzip(bd, last_outbuf, BUFFER_SIZE);
 
-	// Sum up all gotcounts
-	totalcount += gotcount;
+    	// Sum up all gotcounts
+    	totalcount += gotcount;
 
         //lseek(bd->in_fd, bd->cur_file_offset, SEEK_SET);
 
-        if ( gotcount < 0 ) {
+        if ( gotcount < 0 ) 
+        {
             status = gotcount;
             error_print("read_bunzip() returned %d, %s", 
                 gotcount, bunzip_errors[-status]);
             exit(EXIT_FAILURE);
         }
-	else if (gotcount == BUFFER_SIZE) {
-        // If gotcount == BUFFER_SIZE then this is not the last buffer. So store it into prev_outbuf
-	    memcpy (prev_outbuf, last_outbuf, BUFFER_SIZE);
-	    prev_gotcount = gotcount;
-	}
-	else if (gotcount > 0 && gotcount < BUFFER_SIZE) {
-        // if obuf was written not in full then this is the last buffer.
-	    // So store the content of prev_outbuf and last_outbuf into two_last_oubufs
-	    last_gotcount = gotcount;
-	    memcpy(&two_last_outbufs[0], prev_outbuf, sizeof(char) * prev_gotcount);
-	    memcpy(&two_last_outbufs[BUFFER_SIZE], last_outbuf, sizeof(char) * last_gotcount);
-        // Put null char after data end
-	    two_last_outbufs[prev_gotcount + last_gotcount] = '\0';
-        break;
-	}
-	else if (gotcount == 0 && totalcount == 0) {
+	    else if (gotcount == BUFFER_SIZE) 
+        {
+            // If gotcount == BUFFER_SIZE then this is not the last buffer. So store it into prev_outbuf
+	        memcpy (prev_outbuf, last_outbuf, BUFFER_SIZE);
+	        prev_gotcount = gotcount;
+	    }
+	    else if (gotcount > 0 && gotcount < BUFFER_SIZE) 
+        {
+            // if obuf was written not in full then this is the last buffer.
+	        // So store the content of prev_outbuf and last_outbuf into two_last_oubufs
+	        last_gotcount = gotcount;
+	        memcpy(&two_last_outbufs[0], prev_outbuf, sizeof(char) * prev_gotcount);
+	        memcpy(&two_last_outbufs[BUFFER_SIZE], last_outbuf, sizeof(char) * last_gotcount);
+            // Put null char after data end
+	        two_last_outbufs[prev_gotcount + last_gotcount] = '\0';
+            break;
+	    }
+	    else if (gotcount == 0 && totalcount == 0)
+        {
 /*        else if ( gotcount == 0 ) { // if gotcount == 0 obuf is not rewritten, so it contains previous buffer data
             if ( prev_gotcount > 0 ) {// if prev_gotcount is not empty this obuf is the last one in this block
                 break;
             } */
-	    // If the first read_bunzip() wrote 0 bytes into last_outbuf, exit with error.
-	    status = gotcount;
-	    debug_print("read_bunzip() returned %d uncompressing the block %llu. %s",
-            gotcount, bd->cur_file_offset * 8 + pos, bunzip_errors[-status]);
-        exit(EXIT_FAILURE);
-    }
+	        // If the first read_bunzip() wrote 0 bytes into last_outbuf, exit with error.
+	        status = gotcount;
+	        debug_print("read_bunzip() returned %d uncompressing the block %llu. %s",
+                gotcount, bd->cur_file_offset * 8 + pos, bunzip_errors[-status]);
+            exit(EXIT_FAILURE);
+        }
     }
 
     //printf("%s: obuf = %s\n", __func__, obuf);
@@ -771,7 +796,7 @@ int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *t
 
 int seek_dt_str_in_blk(unsigned long pos, bunzip_data *bd, const char * opt_f,
     bool * is_dt_str_found)
-    {
+{
     int status = 0, i = 0;
     int gotcount = 0;
     char obuf[BUFFER_SIZE];
@@ -813,7 +838,8 @@ int seek_dt_str_in_blk(unsigned long pos, bunzip_data *bd, const char * opt_f,
 
             //printf("seek_dt_str_in_blk: iteration %d\n", i);
             // Search from/to strings in obuf. As soon as stings was found - stop checking further blocks.
-            if (*is_dt_str_found = seek_dt_str_in_outbuf(opt_f, gotcount, obuf)) {
+            if (*is_dt_str_found = seek_dt_str_in_outbuf(opt_f, gotcount, obuf))
+            {
 		        //printf("seek_dt_str_in_blk: is_dt_str_found = %d\n", is_dt_str_found);
 		        goto seek_bunzip_finish;
 		    }
@@ -833,7 +859,8 @@ seek_bunzip_finish:
 }
 
 int seek_last_dt_str_in_blk(unsigned long pos, bunzip_data *bd, char * opt_f,
-    bool * is_dt_str_found) {
+    bool * is_dt_str_found)
+{
 
     int status = 0, i = 0;
     int gotcount = 0;
@@ -843,45 +870,45 @@ int seek_last_dt_str_in_blk(unsigned long pos, bunzip_data *bd, char * opt_f,
 
     //printf("seek_dt_str_in_blk: &bd = %p, bd = %p\n", &bd, bd);
     
-        seek_bits_return = seek_bits( bd, pos );
-        //printf("seek_dt_str_in_blk: seek_bits returned %d\n", seek_bits_return);
-        //printf("seek_dt_str_in_blk: opt_f = %s\n", opt_f);
+    seek_bits_return = seek_bits( bd, pos );
+    //printf("seek_dt_str_in_blk: seek_bits returned %d\n", seek_bits_return);
+    //printf("seek_dt_str_in_blk: opt_f = %s\n", opt_f);
 
-        /* Fill the decode buffer for the block */
-        if ( ( status = get_next_block( bd ) ) )
-            goto seek_bunzip_finish;
+    /* Fill the decode buffer for the block */
+    if ( ( status = get_next_block( bd ) ) )
+        goto seek_bunzip_finish;
 
-        /* Init the CRC for writing */
-        bd->writeCRC = 0xffffffffUL;
+    /* Init the CRC for writing */
+    bd->writeCRC = 0xffffffffUL;
 
-        /* Zero this so the current byte from before the seek is not written */
-        bd->writeCopies = 0;
+    /* Zero this so the current byte from before the seek is not written */
+    bd->writeCopies = 0;
 
-        /* Decompress the block and write to stdout */
-        for ( ; ; i++ )
-        {
-            gotcount = read_bunzip( bd, obuf, BUFFER_SIZE );
+    /* Decompress the block and write to stdout */
+    for ( ; ; i++ )
+    {
+        gotcount = read_bunzip( bd, obuf, BUFFER_SIZE );
 	    //printf("seek_dt_str_in_blk: read_bunzip returned %d\n", gotcount);
-            if ( gotcount < 0 )
-            {
-                status = gotcount;
-                break;
-            }
-            else if ( gotcount == 0 )
-            {
-                break;
-            }
-	    else if ( gotcount == BUFFER_SIZE )  // if gotcount == BUFFER_SIZE then we suppose this is not the last buffer of block. So continue to the next buffer.
+        if ( gotcount < 0 )
+        {
+            status = gotcount;
+            break;
+        }
+        else if ( gotcount == 0 )
+        {
+            break;
+        }
+        else if ( gotcount == BUFFER_SIZE )  // if gotcount == BUFFER_SIZE then we suppose this is not the last buffer of block. So continue to the next buffer.
 	    {
 	        continue;
 	    }
-            else
-            {
-                // Here we have an uncompressed data in the last buffer
+        else
+        {
+            // Here we have an uncompressed data in the last buffer
 
-                //printf("seek_dt_str_in_blk: iteration %d\n", i);
-                // Search from/to strings in obuf. As soon as stings was found - stop checking further blocks.
-                //if (*is_dt_str_found = seek_dt_str_in_outbuf(opt_f, gotcount, obuf)) {
+            //printf("seek_dt_str_in_blk: iteration %d\n", i);
+            // Search from/to strings in obuf. As soon as stings was found - stop checking further blocks.
+            //if (*is_dt_str_found = seek_dt_str_in_outbuf(opt_f, gotcount, obuf)) {
 		    //printf("seek_dt_str_in_blk: is_dt_str_found = %d\n", is_dt_str_found);
 		//    goto seek_bunzip_finish;
 		//}
@@ -890,8 +917,8 @@ int seek_last_dt_str_in_blk(unsigned long pos, bunzip_data *bd, char * opt_f,
 
                 write( 1, obuf, gotcount );
                 //exit(EXIT_SUCCESS);
-            }
         }
+    }
 
 seek_bunzip_finish:
 
@@ -1022,10 +1049,10 @@ const char * get_last_dt_str_from_bz2_blk(unsigned long pos, int test_substr_len
     for (obuf_pos = last_char_pos; obuf_pos >= 0; obuf_pos--)
     {
 	    //printf("%c", obuf2[obuf_pos]);
-
+        
 	    if (obuf2[obuf_pos] != '\n')
 	        continue;
-	
+
 	    prev_nl_pos = obuf_pos;
 
         // Get a string from obuf
@@ -1036,7 +1063,7 @@ const char * get_last_dt_str_from_bz2_blk(unsigned long pos, int test_substr_len
         // go to the previous string
         str_len = strlen(str);
         if (str_len <= test_substr_len)
-        {
+        {   // go to the previous newline
             obuf_pos = prev_nl_pos; 
             continue;
         }
@@ -1049,23 +1076,14 @@ const char * get_last_dt_str_from_bz2_blk(unsigned long pos, int test_substr_len
             strncpy(last_dt_str_in_outbuf, test_substr, test_substr_len + 1);
             break;
         }
+        else
+        {
+            // go to the previous newline
+            obuf_pos = prev_nl_pos;
+            continue;
+        }
+        
 
-	    // If test_substr doesn't match to the dt_fmt (strptime == NULL), go to the
-        // next char (in backward direction),
-	    // Else, copy test_substr to last_dt_str_in_outbuf and return it.
-        /*if (!strptime(test_substr, dt_fmt, &dt_tm)) 
-        {
-	        continue;
-	    } 
-        else 
-        {
-	        // Copy test_substr to last_dt_str_in_outbuf
-	        strncpy(last_dt_str_in_outbuf, test_substr, test_substr_len + 1);
-            //printf("%s(): test_substr = %s\n", __func__, test_substr);
-	        //printf("%s: last_dt_str_in_outbuf = %s\n", __func__, last_dt_str_in_outbuf);
-	        break;
-	    }
-        */
     }
 
     return last_dt_str_in_outbuf;
@@ -1448,5 +1466,6 @@ bool dt_substr_in_str(char * str, int str_len, char * test_substr,
 
 void usage(char * program_name)
 {
-    printf("Usage: %s --from=\"date\" --to=\"date\" --file=/path/to/file.bz2\n", program_name);
+    printf("Usage: %s --from=\"date\" --to=\"date\" --file=/path/to/file.bz2\n", 
+            program_name);
 }
