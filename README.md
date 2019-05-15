@@ -10,21 +10,15 @@ I've added a possibility to extract only that bz2 blocks, which contains a data 
 
 
 ### How to use a tool:
-`extract_time_blk --from='' --to='' --file=/full/path/to/file.bz2`
+`extract_time_blk_bz2 --from="datetime" --to="datetime" --file="/full/path/to/file.bz2"`
 
 Where supported from/to datetime formats are:
 
 - "%Y-%m-%dT%H:%M:%S" (Ex. "2017-02-21T14:53:22")
 - "%b %d %H:%M:%S"    (Ex. "Oct 30 05:54:01") 
 - "%Y-%m-%d %H:%M:%S" (Ex. "2017-02-21 14:53:22")
+- "%d/%b/%Y:%H:%M:%S" (Ex. "12/Dec/2015:18:39:27") 
 
 ### Limitations:
 It was used on x64 architecture.
-Datatime substring in a log should be at the beginning of a string. For ex.:
-`2018-12-02T21:38:29 text text text ...`
-
-`2018-12-02T21:38:30 text text text ...`
-
-
-
-
+Doesn't work on Windows because there is no strptime() function
