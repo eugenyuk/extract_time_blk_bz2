@@ -8,7 +8,7 @@
 #include <stdlib.h>			// exit()
 #include <fcntl.h>
 #include <unistd.h>			// lseek(), read(), getopt()
-//#include "dec_to_bin.c"			// dec_to_bin_ll()
+//#include "dec_to_bin.c"	// dec_to_bin_ll()
 //#include "../binbit.c"
 #include <getopt.h>			// getopt_long()
 #include "micro-bunzip.h"
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     int ifd, opt, status, dt_substr_len;
     off_t file_size;
     // options --from, --to, --file
-    const char * opt_f, * opt_to, * opt_input_file;	
+    const char *opt_f, *opt_to, *opt_input_file;	
     bunzip_data *bd;
     // bit position of start of a block where opt_from/opt_to string was found
     off_t opt_from_pos, opt_to_pos;
@@ -142,7 +142,8 @@ int main(int argc, char *argv[])
 	    exit(EXIT_FAILURE);
     }
 
-// Define datetime formats of --from and --to arguments and check if they are equal.
+// Define datetime formats of --from and --to arguments and check if they are
+// equal.
     opt_from_dt_fmt = def_dt_fmt(opt_f);
     //printf("%s(): opt_f = \"%s\", datetime format = \"%s\"\n",
     //     __func__, opt_f, opt_from_dt_fmt);
@@ -151,7 +152,7 @@ int main(int argc, char *argv[])
     //  __func__, opt_to, opt_to_dt_fmt);
     
     // Check if opt_f datetime format equals to opt_to datetime format
-    if (strcmp(opt_from_dt_fmt, opt_to_dt_fmt) != 0) 
+    if ( strcmp(opt_from_dt_fmt, opt_to_dt_fmt) != 0 ) 
     {
 	    error_print("%s\n", "Values of --from and --to were not set in the same"
             " datetime format");
@@ -209,8 +210,7 @@ int main(int argc, char *argv[])
     //printf("%s: file_last_date (block %llu) is: %s\n", 
     //        __func__, cur_rel_bz2_blk_pos, file_first_date);
     file_last_date = get_last_dt_str_from_bz2_blk(cur_rel_bz2_blk_pos, 
-                                                  dt_substr_len, bd, 
-                                                  last_dt_str_in_outbuf, dt_fmt);
+        dt_substr_len, bd, last_dt_str_in_outbuf, dt_fmt);
     last_blk_pos = bd->cur_file_offset * 8 + cur_rel_bz2_blk_pos;
     debug_print("file_last_date (block %llu) is: %s\n",
                  last_blk_pos, file_last_date);
@@ -232,8 +232,7 @@ int main(int argc, char *argv[])
 
 // Search a block where opt_f is located
     opt_from_pos = opt_from_bin_search(0, file_size, opt_from_time_t, bd, opt_f,
-                                       dt_substr_len, first_dt_str_in_outbuf,
-                                       dt_fmt);
+        dt_substr_len, first_dt_str_in_outbuf, dt_fmt);
                                        
     debug_print("opt_from_pos = %llu", opt_from_pos);
     debug_print("bd->cur_file_offset = %llu", bd->cur_file_offset);
@@ -457,7 +456,7 @@ const char * def_dt_fmt(const char * dt_str)
     
     // 2. check if opt_f, opt_to strings correspond to one of supported
     // datetime formats
-    for (short i = 0; i < dt_fmts_arr_size; i++)
+    for (int i = 0; i < dt_fmts_arr_size; i++)
     {
         if (strptime(dt_str, DATETIME_FORMATS[i], &dt_tm) != NULL)
             return DATETIME_FORMATS[i];
@@ -479,10 +478,14 @@ for a bz2 block which is nearest from the current middle byte element.
 Then it finds the first datetime sting in the found bz2 block, converts it to 
 epoch format and compares it to the opt_from_time_t value to understand where it
 should continue searching the next middle byte. */
-unsigned long opt_from_bin_search(off_t low, off_t high, 
-                            time_t opt_from_time_t, bunzip_data *bd,
-                            const char *opt_f, int dt_length,
-                            char *first_dt_str_in_outbuf, const char *dt_fmt)
+unsigned long opt_from_bin_search(off_t low,
+                                  off_t high, 
+                                  time_t opt_from_time_t,
+                                  bunzip_data *bd,
+                                  const char *opt_f,
+                                  int dt_length,
+                                  char *first_dt_str_in_outbuf,
+                                  const char *dt_fmt)
 {
     off_t mid, mid_pos;
     unsigned int mid_pos_in_bytes;
@@ -633,7 +636,7 @@ off_t lseek_set(bunzip_data *bd, off_t offset)
  * bits already consumed. This probably only makes sense for seeking to the
  * start of a compressed block.
  */
-unsigned int seek_bits( bunzip_data *bd, unsigned long pos )
+unsigned int seek_bits(bunzip_data *bd, unsigned long pos)
 {
     long n_byte = pos / 8;
     char n_bit = pos % 8;
@@ -642,9 +645,8 @@ unsigned int seek_bits( bunzip_data *bd, unsigned long pos )
     debug_print("lseek position = %lu, n_byte(%lu) + bd->cur_file_offset(%lu)", 
         lseek(bd->in_fd, 0, SEEK_CUR), n_byte, bd->cur_file_offset);
  
-    // Seek the underlying file descriptor
-    // + bd->cur_file_offset because lseek returns the amount of bytes from the
-    // beginning of a file
+    // Seek the underlying file descriptor + bd->cur_file_offset because lseek
+    // returns the amount of bytes from the beginning of a file
     if ( (lseek( bd->in_fd, n_byte, SEEK_CUR)) != n_byte + bd->cur_file_offset) 
     {
     //if ( (lseek( bd->in_fd, n_byte, SEEK_CUR)) != n_byte) {
@@ -674,7 +676,7 @@ int uncompress_first_buf_of_blk(unsigned long pos, bunzip_data *bd, char *obuf)
     seek_bits( bd, pos );
 
     /* Fill the decode buffer for the block */
-    if ((status = get_next_block( bd )))
+    if (status = get_next_block( bd ))
     {
         error_print("get_next_block() returned %d, bunzip_errors[-status]",
                      status);
@@ -929,8 +931,12 @@ seek_bunzip_finish:
 
 // Function gets the first datetime string which corresponds to one of known 
 // datetime formats
-const char * get_first_dt_str_from_bz2_blk(unsigned long pos, int test_substr_len,
-            bunzip_data *bd, char * first_dt_str_in_outbuf, const char * dt_fmt)
+const char* 
+get_first_dt_str_from_bz2_blk(  unsigned long   pos, 
+                                int             test_substr_len,
+                                bunzip_data*    bd,
+                                char*           first_dt_str_in_outbuf,
+                                const char*     dt_fmt)
 {
     // byte/char position within obuf
     int obuf_pos;
@@ -1000,8 +1006,12 @@ const char * get_first_dt_str_from_bz2_blk(unsigned long pos, int test_substr_le
 
 // Function searches for the last datetime substring in the end of the last bz2
 // block
-const char * get_last_dt_str_from_bz2_blk(unsigned long pos, int test_substr_len, 
-                bunzip_data *bd, char *last_dt_str_in_outbuf, const char *dt_fmt)
+const char* 
+get_last_dt_str_from_bz2_blk(   unsigned long   pos,
+                                int             test_substr_len, 
+                                bunzip_data*    bd,
+                                char*           last_dt_str_in_outbuf,
+                                const char*     dt_fmt)
 {
     // byte/char position within obuf
     int obuf_pos;

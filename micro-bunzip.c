@@ -29,147 +29,76 @@
  Manuel
  */
 
-#include <setjmp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <limits.h>
+//#include <setjmp.h>
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
+//#include <unistd.h>
+//#include <limits.h>
+#include "micro-bunzip.h"
 
-/* Constants for huffman coding */
-#define MAX_GROUPS   6
-#define GROUP_SIZE     50  /* 64 would have been more efficient */
-#define MAX_HUFCODE_BITS  20  /* Longest huffman code allowed */
-#define MAX_SYMBOLS   258  /* 256 literals + RUNA + RUNB */
-#define SYMBOL_RUNA   0
-#define SYMBOL_RUNB   1
+///* Constants for huffman coding */
+//#define MAX_GROUPS          6
+//#define GROUP_SIZE          50  /* 64 would have been more efficient */
+//#define MAX_HUFCODE_BITS    20  /* Longest huffman code allowed */
+//#define MAX_SYMBOLS         258 /* 256 literals + RUNA + RUNB */
+//#define SYMBOL_RUNA         0
+//#define SYMBOL_RUNB         1
 
-/* Status return values */
-#define RETVAL_OK      0
-#define RETVAL_LAST_BLOCK    (-1)
-#define RETVAL_NOT_BZIP_DATA   (-2)
-#define RETVAL_UNEXPECTED_INPUT_EOF  (-3)
-#define RETVAL_UNEXPECTED_OUTPUT_EOF (-4)
-#define RETVAL_DATA_ERROR    (-5)
-#define RETVAL_OUT_OF_MEMORY   (-6)
-#define RETVAL_OBSOLETE_INPUT   (-7)
+///* Status return values */
+//#define RETVAL_OK                       0
+//#define RETVAL_LAST_BLOCK               (-1)
+//#define RETVAL_NOT_BZIP_DATA            (-2)
+//#define RETVAL_UNEXPECTED_INPUT_EOF     (-3)
+//#define RETVAL_UNEXPECTED_OUTPUT_EOF    (-4)
+//#define RETVAL_DATA_ERROR               (-5)
+//#define RETVAL_OUT_OF_MEMORY            (-6)
+//#define RETVAL_OBSOLETE_INPUT           (-7)
+//#define RETVAL_END_OF_BLOCK             (-8)
 
-#define RETVAL_END_OF_BLOCK             (-8)
-
-/* Other housekeeping constants */
-#define IOBUF_SIZE   4096
-
-/* conditional comment */
-//#define GET_BITS_VERBOSE
-
-/* This is what we know about each huffman coding group */
-struct group_data
-{
-    /* We have an extra slot at the end of limit[] for a sentinal value. */
-    int limit[MAX_HUFCODE_BITS+1], base[MAX_HUFCODE_BITS], permute[MAX_SYMBOLS];
-    int minLen, maxLen;
-};
-
-/* Structure holding all the housekeeping data, including IO buffers and
-   memory that persists between calls to bunzip */
-typedef struct
-{
-    /* State for interrupting output loop */
-    int writeCopies, writePos, writeRunCountdown, writeCount, writeCurrent;
-    /* I/O tracking data (file handles, buffers, positions, etc.) */
-    int in_fd, out_fd, inbufCount, inbufPos /*,outbufPos*/;
-    // james@jamestaylor.org: track relative position in input so we don't need tell
-    off_t position;
-    unsigned char *inbuf /*,*outbuf*/;
-    unsigned int inbufBitCount, inbufBits;
-    /* The CRC values stored in the block header and calculated from the data */
-    unsigned int crc32Table[256], headerCRC, totalCRC, writeCRC;
-    /* Intermediate buffer and its size (in bytes) */
-    unsigned int *dbuf, dbufSize;
-    /* These things are a bit too big to go on the stack */
-    unsigned char selectors[32768];   /* nSelectors=15 bits */
-    struct group_data groups[MAX_GROUPS]; /* huffman coding tables */
-    /* For I/O error handling */
-    jmp_buf jmpbuf;
-    long cur_file_offset;
-}
-bunzip_data;
+///* Other housekeeping constants */
+//#define IOBUF_SIZE   4096
 
 
-#ifdef GET_BITS_VERBOSE
+///* This is what we know about each huffman coding group */
+//struct group_data
+//{
+//    /* We have an extra slot at the end of limit[] for a sentinal value. */
+//    int limit[MAX_HUFCODE_BITS + 1];
+//    int base[MAX_HUFCODE_BITS];
+//    int permute[MAX_SYMBOLS];
+//    int minLen, maxLen;
+//};
 
-unsigned int get_bits( bunzip_data *bd, char bits_wanted )
-{
-    unsigned int bits = 0;
+///* Structure holding all the housekeeping data, including IO buffers and
+//   memory that persists between calls to bunzip */
+//typedef struct
+//{
+//    /* State for interrupting output loop */
+//    int writeCopies, writePos, writeRunCountdown, writeCount, writeCurrent;
+//    /* I/O tracking data (file handles, buffers, positions, etc.) */
+//    int in_fd, out_fd, inbufCount, inbufPos /*,outbufPos*/;
+//    // james@jamestaylor.org: track relative position in input so we don't need tell
+//    off_t position;
+//    unsigned char *inbuf /*,*outbuf*/;
+//    unsigned int inbufBitCount, inbufBits;
+//    /* The CRC values stored in the block header and calculated from the data */
+//    unsigned int crc32Table[256], headerCRC, totalCRC, writeCRC;
+//    /* Intermediate buffer and its size (in bytes) */
+//    unsigned int *dbuf, dbufSize;
+//    /* These things are a bit too big to go on the stack */
+//    unsigned char selectors[32768];   /* nSelectors=15 bits */
+//    struct group_data groups[MAX_GROUPS]; /* huffman coding tables */
+//    /* For I/O error handling */
+//    jmp_buf jmpbuf;
+//    long cur_file_offset;
+//}
+//bunzip_data;
 
-    /* If we need to get more data from the byte buffer, do so.  (Loop getting
-       one byte at a time to enforce endianness and avoid unaligned access.) */
-
-        //**
-    printf("\nget_bits(%d) started:\n", bits_wanted);
-//    printf("bd->inbufBitCount|%u| < bits_wanted|%d|\n", bd->inbufBitCount, bits_wanted);
-    printf("while ( bd->inbufBitCount|%u| < bits_wanted|%d| )\n", bd->inbufBitCount, bits_wanted);
-
-    while ( bd->inbufBitCount < bits_wanted )
-    {
-        /* If we need to read more data from file into byte buffer, do so */
-        printf("\tif (bd->inbufPos(%u) == bd->inbufCount(%u))\n", bd->inbufPos, bd->inbufCount);
-        if ( bd->inbufPos == bd->inbufCount )
-        {
-            if ( ( bd->inbufCount = read( bd->in_fd, bd->inbuf, IOBUF_SIZE ) ) <= 0 )
-                longjmp( bd->jmpbuf, RETVAL_UNEXPECTED_INPUT_EOF );
-            printf("\t\tbd->inbufCount|%d| = read(bd->in_fd|%d|, bd->inbuf|%p|, IOBUF_SIZE|%d|)\n", bd->inbufCount, bd->in_fd, bd->inbuf, IOBUF_SIZE);
-            // james@jamestaylor.org: track position
-                        printf("\t\tbd->position = bd->position|%u| + bd->inbufCount|%u| = ", bd->position, bd->inbufCount);
-            bd->position += bd->inbufCount;
-                        printf("%u\n", bd->position);
-            bd->inbufPos = 0;
-            printf("\t\tbd->inbufPos = 0\n");
-        }
-
-        /* Avoid 32-bit overflow (dump bit buffer to top of output) */
-                printf("\tif ( bd->inbufBitCount|%u| >= 24 )\n", bd->inbufBitCount);
-        if ( bd->inbufBitCount >= 24 )
-        {
-         printf("\t\tbits = bd->inbufBits|%u| & ( ( 1 << bd->inbufBitCount|%d| ) - 1 ) = %u & (%u - 1) = %u & %u = ", bd->inbufBits, bd->inbufBitCount, bd->inbufBits, 1 << bd->inbufBitCount, bd->inbufBits, ( 1 << bd->inbufBitCount ) - 1);
-            bits = bd->inbufBits & ( ( 1 << bd->inbufBitCount ) - 1 );
-                        printf("%u\n", bits);
-                        printf("\t\tbits_wanted = bits_wanted|%u| - bd->inbufBitCount|%u| = ", bits_wanted, bd->inbufBitCount);
-            bits_wanted -= bd->inbufBitCount;
-                        printf("%u\n", bits_wanted);
-                        printf("\t\tbits = bits|%u| << bits_wanted|%d| = ", bits, bits_wanted);
-            bits <<= bits_wanted;
-printf("%u\n", bits);
-            bd->inbufBitCount = 0;
-                        printf("\t\tbd->inbufBitCount = 0\n");
-        }
-        /* Grab next 8 bits of input from buffer. */
-                printf("\tbd->inbufBits = ( bd->inbufBits|%u| << 8 ) | bd->inbuf[bd->inbufPos++|%u|] = %u | %u = ", bd->inbufBits, bd->inbufPos, bd->inbufBits << 8, bd->inbuf[bd->inbufPos]);
-        bd->inbufBits = ( bd->inbufBits << 8 ) | bd->inbuf[bd->inbufPos++];
-                printf("%u\n", bd->inbufBits);
-                printf("\tbd->inbufBitCount = bd->inbufBitCount|%u| + 8 = ", bd->inbufBitCount);
-        bd->inbufBitCount += 8;
-                printf("%u\n", bd->inbufBitCount);
-
-        printf("while ( bd->inbufBitCount|%u| < bits_wanted|%d| )\n", bd->inbufBitCount, bits_wanted);
-    }
-    /* Calculate result */
-        printf("bd->inbufBitCount = bd->inbufBitCount|%u| - bits_wanted|%d| = ", bd->inbufBitCount, bits_wanted);
-    bd->inbufBitCount -= bits_wanted;
-        printf("%u\n", bd->inbufBitCount);
-        printf("bits = bits|%u| | ( bd->inbufBits|%u| >> bd->inbufBitCount|%u| ) & ( ( 1 << bits_wanted|%d| ) - 1 ) = %u | %u & (%u - 1) = %u | %u = ", bits, bd->inbufBits, bd->inbufBitCount, bits_wanted, bits, bd->inbufBits >> bd->inbufBitCount, 1 << bits_wanted, bits, ( bd->inbufBits >> bd->inbufBitCount ) & ( ( 1 << bits_wanted ) - 1 ));
-    bits |= ( bd->inbufBits >> bd->inbufBitCount ) & ( ( 1 << bits_wanted ) - 1 );
-        printf("%u\n" ,bits);
-
-        printf("get_bits returned: %u\n=========================\n\n", bits);
-    return bits;
-}
-
-#else
 
 /* Return the next nnn bits of input.  All reads from the compressed input
    are done through this function.  All reads are big endian */
-unsigned int get_bits( bunzip_data *bd, char bits_wanted )
+unsigned int get_bits(bunzip_data *bd, char bits_wanted)
 {
     unsigned int bits = 0;
 
@@ -177,41 +106,40 @@ unsigned int get_bits( bunzip_data *bd, char bits_wanted )
 
     /* If we need to get more data from the byte buffer, do so.  (Loop getting
      one byte at a time to enforce endianness and avoid unaligned access.) */
-    while ( bd->inbufBitCount < bits_wanted )
+    while (bd->inbufBitCount < bits_wanted)
     {
         /* If we need to read more data from file into byte buffer, do so */
         if ( bd->inbufPos == bd->inbufCount )
         {
             if ((bd->inbufCount = read(bd->in_fd, bd->inbuf, IOBUF_SIZE)) <= 0)
-                longjmp( bd->jmpbuf, RETVAL_UNEXPECTED_INPUT_EOF );
-            // james@jamestaylor.org: track position
-            bd->position += bd->inbufCount;
+                longjmp(bd->jmpbuf, RETVAL_UNEXPECTED_INPUT_EOF);
+            // eugenyuk@gmail.com: meningless
+            //// james@jamestaylor.org: track position
+            //bd->position += bd->inbufCount;
             bd->inbufPos = 0;
         }
         /* Avoid 32-bit overflow (dump bit buffer to top of output) */
-        if ( bd->inbufBitCount >= 24 )
+        if (bd->inbufBitCount >= 24)
         {
-            bits = bd->inbufBits & ( ( 1 << bd->inbufBitCount ) - 1 );
+            bits = bd->inbufBits & ( (1 << bd->inbufBitCount) - 1 );
             bits_wanted -= bd->inbufBitCount;
             bits <<= bits_wanted;
             bd->inbufBitCount = 0;
         }
         /* Grab next 8 bits of input from buffer. */
-       bd->inbufBits = ( bd->inbufBits << 8 ) | bd->inbuf[bd->inbufPos++];
+        bd->inbufBits = (bd->inbufBits << 8) | bd->inbuf[bd->inbufPos++];
         bd->inbufBitCount += 8;
     }
     /* Calculate result */
     bd->inbufBitCount -= bits_wanted;
-    bits |= ( bd->inbufBits >> bd->inbufBitCount ) & ( ( 1 << bits_wanted ) - 1 );
+    bits |= (bd->inbufBits >> bd->inbufBitCount) & ( (1 << bits_wanted) - 1 );
 
     return bits;
 }
 
-#endif /* GET_BITS_VERBOSE */
 
 /* Unpacks the next block and sets up for the inverse burrows-wheeler step. */
-
-int get_next_block( bunzip_data *bd )
+int get_next_block(bunzip_data *bd)
 {
     struct group_data *hufGroup;
     int dbufCount, nextSym, dbufSize, groupCount, *base, *limit, selector,
@@ -233,105 +161,120 @@ int get_next_block( bunzip_data *bd )
 	//printf("get_next_block: i j = %x %x\n", i, j);
     
 	bd->headerCRC = get_bits( bd, 32 );
-    if ( ( i == 0x177245 ) && ( j == 0x385090 ) ) return RETVAL_LAST_BLOCK;
-    if ( ( i != 0x314159 ) || ( j != 0x265359 ) ) return RETVAL_NOT_BZIP_DATA;
+    if ( (i == 0x177245) && (j == 0x385090) ) return RETVAL_LAST_BLOCK;
+    if ( (i != 0x314159) || (j != 0x265359) ) return RETVAL_NOT_BZIP_DATA;
     /* We can add support for blockRandomised if anybody complains.  There was
        some code for this in busybox 1.0.0-pre3, but nobody ever noticed that
        it didn't actually work. */
-    if ( get_bits( bd, 1 ) ) return RETVAL_OBSOLETE_INPUT;
-    if ( ( origPtr = get_bits( bd, 24 ) ) > dbufSize ) return RETVAL_DATA_ERROR;
+    if ( get_bits(bd, 1) ) return RETVAL_OBSOLETE_INPUT;
+    if ( (origPtr = get_bits(bd, 24) ) > dbufSize ) return RETVAL_DATA_ERROR;
+
     /* mapping table: if some byte values are never used (encoding things
        like ascii text), the compression code removes the gaps to have fewer
        symbols to deal with, and writes a sparse bitfield indicating which
        values were present.  We make a translation table to convert the symbols
        back to the corresponding bytes. */
-    t = get_bits( bd, 16 );
+    t = get_bits(bd, 16);
     symTotal = 0;
-    for ( i = 0;i < 16;i++ )
+    for (i = 0; i < 16; i++)
     {
-        if ( t&( 1 << ( 15 - i ) ) )
+        if (t & (1 << (15 - i)))
         {
-            k = get_bits( bd, 16 );
-            for ( j = 0;j < 16;j++ )
-                if ( k&( 1 << ( 15 - j ) ) ) symToByte[symTotal++] = ( 16 * i ) + j;
+            k = get_bits(bd, 16);
+            for (j = 0; j < 16; j++)
+            {
+                if (k & (1 << (15 - j)))
+                    symToByte[symTotal++] = (16 * i) + j;
+            }
         }
     }
+
 	/* How many different huffman coding groups does this block use? */
-    groupCount = get_bits( bd, 3 );
-    if ( groupCount < 2 || groupCount > MAX_GROUPS ) return RETVAL_DATA_ERROR;
+    groupCount = get_bits(bd, 3);
+    if (groupCount < 2 || groupCount > MAX_GROUPS) return RETVAL_DATA_ERROR;
+
     /* nSelectors: Every GROUP_SIZE many symbols we select a new huffman coding
-       group.  Read in the group selector list, which is stored as MTF encoded
+       group. Read in the group selector list, which is stored as MTF encoded
        bit runs.  (MTF=Move To Front, as each value is used it's moved to the
        start of the list.) */
-    if ( !( nSelectors = get_bits( bd, 15 ) ) ) return RETVAL_DATA_ERROR;
-	for ( i = 0; i < groupCount; i++ ) mtfSymbol[i] = i;
-    for ( i = 0; i < nSelectors; i++ )
-    {
+    if ( !(nSelectors = get_bits(bd, 15)) ) return RETVAL_DATA_ERROR;
+	for (i = 0; i < groupCount; i++) mtfSymbol[i] = i;
+    for (i = 0; i < nSelectors; i++) {
         /* Get next value */
-        //for ( j = 0;get_bits( bd, 1 );j++ ) if ( j >= groupCount ) return RETVAL_DATA_ERROR;
-        for ( j = 0;get_bits( bd, 1 );j++ ) {
-			//printf("j = %d, groupCount = %d\n", j, groupCount);
-			if ( j >= groupCount ) {
-                //printf("get_next_block: data_error\n"); 
-				return RETVAL_DATA_ERROR;
-			}
-		}
+        for (j = 0; get_bits(bd, 1); j++)
+			if (j >= groupCount) return RETVAL_DATA_ERROR;
+
         /* Decode MTF to get the next selector */
         uc = mtfSymbol[j];
-        for ( ;j;j-- ) mtfSymbol[j] = mtfSymbol[j-1];
+        for ( ; j; j--) mtfSymbol[j] = mtfSymbol[j-1];
         mtfSymbol[0] = selectors[i] = uc;
     }
+    
     
 	/* Read the huffman coding tables for each group, which code for symTotal
        literal symbols, plus two run symbols (RUNA, RUNB) */
     symCount = symTotal + 2;
-    for ( j = 0; j < groupCount; j++ )
+
+    /* eugenyuk@gmail.com:
+       Each Huffman tree itself is represented by a list of integers of length
+       symCount. The integers represent the bit-length of each corresponding
+       symbol’s Huffman code. This list of integers is written as a
+       delta-encoded list, which is headed by a 5-bit integer containing an
+       initial bit-length. Each symbol’s lengthis represented by a
+       zero-terminated sequence of 10 and 11 bit-strings, which increment or
+       decrement the current bit-length, respectively. */
+
+    for (j = 0; j < groupCount; j++)
     {
-        unsigned char length[MAX_SYMBOLS], temp[MAX_HUFCODE_BITS+1];
+        unsigned char length[MAX_SYMBOLS], temp[MAX_HUFCODE_BITS + 1];
         int minLen, maxLen, pp;
-        /* Read huffman code lengths for each symbol.  They're stored in
+        /* Read huffman code lengths for each symbol. They're stored in
            a way similar to mtf; record a starting value for the first symbol,
            and an offset from the previous value for everys symbol after that.
            (Subtracting 1 before the loop and then adding it back at the end is
            an optimization that makes the test inside the loop simpler: symbol
            length 0 becomes negative, so an unsigned inequality catches it.) */
-        t = get_bits( bd, 5 ) - 1;
+        t = get_bits(bd, 5) - 1;
         for ( i = 0; i < symCount; i++ )
         {
             for ( ;; )
             {
-                if ( ( ( unsigned )t ) > ( MAX_HUFCODE_BITS - 1 ) )
+                if ( ( (unsigned)t ) > (MAX_HUFCODE_BITS - 1) )
                     return RETVAL_DATA_ERROR;
-                /* If first bit is 0, stop.  Else second bit indicates whether
-                   to increment or decrement the value.  Optimization: grab 2
+                /* If first bit is 0, stop. Else second bit indicates whether
+                   to increment or decrement the value. Optimization: grab 2
                    bits and unget the second if the first was 0. */
-                k = get_bits( bd, 2 );
-                if ( k < 2 )
+                k = get_bits(bd, 2);
+                if (k < 2)
                 {
                     bd->inbufBitCount++;
                     break;
                 }
-                /* Add one if second bit 1, else subtract 1.  Avoids if/else */
-                t += ( ( ( k + 1 ) & 2 ) - 1 );
+                /* Add one if second bit 1, else subtract 1. Avoids if/else */
+                t += ( ((k + 1) & 2) - 1 );
             }
             /* Correct for the initial -1, to get the final symbol length */
             length[i] = t + 1;
         }
+
         /* Find largest and smallest lengths in this group */
         minLen = maxLen = length[0];
-        for ( i = 1; i < symCount; i++ )
+        for (i = 1; i < symCount; i++)
         {
-            if ( length[i] > maxLen ) maxLen = length[i];
-            else if ( length[i] < minLen ) minLen = length[i];
+            if (length[i] > maxLen)
+                maxLen = length[i];
+            else if (length[i] < minLen)
+                minLen = length[i];
         }
+
         /* Calculate permute[], base[], and limit[] tables from length[].
          *
          * permute[] is the lookup table for converting huffman coded symbols
-         * into decoded symbols.  base[] is the amount to subtract from the
+         * into decoded symbols. base[] is the amount to subtract from the
          * value of a huffman symbol of a given length when using permute[].
          *
          * limit[] indicates the largest numerical value a symbol with a given
-         * number of bits can have.  This is how the huffman codes can vary in
+         * number of bits can have. This is how the huffman codes can vary in
          * length: each code with a value>limit[length] needs another bit.
          */
         hufGroup = bd->groups + j;
@@ -342,33 +285,36 @@ int get_next_block( bunzip_data *bd )
            entry.  We do this again when using them (during symbol decoding).*/
         base = hufGroup->base - 1;
         limit = hufGroup->limit - 1;
-        /* Calculate permute[].  Concurently, initialize temp[] and limit[]. */
+        /* Calculate permute[]. Concurently, initialize temp[] and limit[]. */
         pp = 0;
-        for ( i = minLen;i <= maxLen;i++ )
+        for (i = minLen; i <= maxLen; i++)
         {
             temp[i] = limit[i] = 0;
-            for ( t = 0;t < symCount;t++ )
-                if ( length[t] == i ) hufGroup->permute[pp++] = t;
+            for (t = 0; t < symCount; t++)
+                if (length[t] == i) hufGroup->permute[pp++] = t;
         }
+
         /* Count symbols coded for at each bit length */
-        for ( i = 0;i < symCount;i++ ) temp[length[i]]++;
+        for (i = 0; i < symCount; i++) 
+            temp[length[i]]++;
+        
         /* Calculate limit[] (the largest symbol-coding value at each bit
          * length, which is (previous limit<<1)+symbols at this level), and
          * base[] (number of symbols to ignore at each bit length, which is
          * limit minus the cumulative count of symbols coded for already). */
         pp = t = 0;
-        for ( i = minLen; i < maxLen; i++ )
+        for (i = minLen; i < maxLen; i++)
         {
             pp += temp[i];
             /* We read the largest possible symbol size and then unget bits
                after determining how many we need, and those extra bits could
-               be set to anything.  (They're noise from future symbols.)  At
+               be set to anything.  (They're noise from future symbols.) At
                each level we're really only interested in the first few bits,
                so here we set all the trailing to-be-ignored bits to 1 so they
                don't affect the value>limit[length] comparison. */
-            limit[i] = ( pp << ( maxLen - i ) ) - 1;
+            limit[i] = ( pp << (maxLen - i) ) - 1;
             pp <<= 1;
-            base[i+1] = pp - ( t += temp[i] );
+            base[i+1] = pp - (t += temp[i]);
         }
         limit[maxLen+1] = INT_MAX; /* Sentinal value for reading next sym. */
         limit[maxLen] = pp + temp[maxLen] - 1;
@@ -379,20 +325,21 @@ int get_next_block( bunzip_data *bd )
        and run length encoding, saving the result into dbuf[dbufCount++]=uc */
 
     /* Initialize symbol occurrence counters and symbol Move To Front table */
-    for ( i = 0;i < 256;i++ )
+    for (i = 0; i < 256; i++)
     {
         byteCount[i] = 0;
-        mtfSymbol[i] = ( unsigned char )i;
+        mtfSymbol[i] = (unsigned char)i;
     }
+
     /* Loop through compressed symbols. */
     runPos = dbufCount = symCount = selector = 0;
     for ( ;; )
     {
         /* Determine which huffman coding group to use. */
-        if ( !( symCount-- ) )
+        if ( !(symCount--) )
         {
             symCount = GROUP_SIZE - 1;
-            if ( selector >= nSelectors ) return RETVAL_DATA_ERROR;
+            if (selector >= nSelectors) return RETVAL_DATA_ERROR;
             hufGroup = bd->groups + selectors[selector++];
             base = hufGroup->base - 1;
             limit = hufGroup->limit - 1;
@@ -402,32 +349,32 @@ int get_next_block( bunzip_data *bd )
            to read minLen bits and then an additional bit at a time, testing
            as we go.  Because there is a trailing last block (with file CRC),
            there is no danger of the overread causing an unexpected EOF for a
-           valid compressed file.  As a further optimization, we do the read
+           valid compressed file. As a further optimization, we do the read
            inline (falling back to a call to get_bits if the buffer runs
            dry).  The following (up to got_huff_bits:) is equivalent to
            j=get_bits(bd,hufGroup->maxLen);
          */
-        while ( bd->inbufBitCount < hufGroup->maxLen )
+        while (bd->inbufBitCount < hufGroup->maxLen)
         {
-            if ( bd->inbufPos == bd->inbufCount )
+            if (bd->inbufPos == bd->inbufCount)
             {
-                j = get_bits( bd, hufGroup->maxLen );
+                j = get_bits(bd, hufGroup->maxLen);
                 goto got_huff_bits;
             }
-            bd->inbufBits = ( bd->inbufBits << 8 ) | bd->inbuf[bd->inbufPos++];
+            bd->inbufBits = (bd->inbufBits << 8) | bd->inbuf[bd->inbufPos++];
             bd->inbufBitCount += 8;
         };
         bd->inbufBitCount -= hufGroup->maxLen;
-        j = ( bd->inbufBits >> bd->inbufBitCount ) & ( ( 1 << hufGroup->maxLen ) - 1 );
+        j = (bd->inbufBits >> bd->inbufBitCount) & ( (1 << hufGroup->maxLen) - 1 );
 
 got_huff_bits:
-        /* Figure how how many bits are in next symbol and unget extras */
+        /* Figure how many bits are in next symbol and unget extras */
         i = hufGroup->minLen;
-        while ( j > limit[i] ) ++i;
-        bd->inbufBitCount += ( hufGroup->maxLen - i );
+        while (j > limit[i]) ++i;
+        bd->inbufBitCount += (hufGroup->maxLen - i);
         /* Huffman decode value to get nextSym (with bounds checking) */
-        if ( ( i > hufGroup->maxLen )
-                || ( ( ( unsigned )( j = ( j >> ( hufGroup->maxLen - i ) ) - base[i] ) )
+        if ( (i > hufGroup->maxLen)
+                || ( ( (unsigned)(j = ( j >> (hufGroup->maxLen - i) ) - base[i]) )
                      >= MAX_SYMBOLS ) )
             return RETVAL_DATA_ERROR;
         nextSym = hufGroup->permute[j];
@@ -435,7 +382,7 @@ got_huff_bits:
            byte, or a repeated run of the most recent literal byte.  First,
            check if nextSym indicates a repeated run, and if so loop collecting
            how many times to repeat the last literal. */
-        if ( ( ( unsigned )nextSym ) <= SYMBOL_RUNB )
+        if ( ( (unsigned)nextSym ) <= SYMBOL_RUNB )
         { /* RUNA or RUNB */
             /* If this is the start of a new run, zero out counter */
             if ( !runPos )
@@ -450,7 +397,7 @@ got_huff_bits:
                the basic or 0/1 method (except all bits 0, which would use no
                symbols, but a run of length 0 doesn't mean anything in this
                context).  Thus space is saved. */
-            t += ( runPos << nextSym ); /* +runPos if RUNA; +2*runPos if RUNB */
+            t += (runPos << nextSym); /* +runPos if RUNA; +2*runPos if RUNB */
             runPos <<= 1;
             continue;
         }
@@ -458,25 +405,26 @@ got_huff_bits:
            how many times to repeat the last literal, so append that many
            copies to our buffer of decoded symbols (dbuf) now.  (The last
            literal used is the one at the head of the mtfSymbol array.) */
-        if ( runPos )
+        if (runPos)
         {
             runPos = 0;
-            if ( dbufCount + t >= dbufSize ) return RETVAL_DATA_ERROR;
+            if (dbufCount + t >= dbufSize) return RETVAL_DATA_ERROR;
 
             uc = symToByte[mtfSymbol[0]];
             byteCount[uc] += t;
             while ( t-- ) dbuf[dbufCount++] = uc;
         }
         /* Is this the terminating symbol? */
-        if ( nextSym > symTotal ) break;
+        if (nextSym > symTotal) break;
+
         /* At this point, nextSym indicates a new literal character.  Subtract
            one to get the position in the MTF array at which this literal is
            currently to be found.  (Note that the result can't be -1 or 0,
            because 0 and 1 are RUNA and RUNB.  But another instance of the
            first symbol in the mtf array, position 0, would have been handled
-           as part of a run above.  Therefore 1 unused mtf position minus
+           as part of a run above. Therefore 1 unused mtf position minus
            2 non-literal nextSym values equals -1.) */
-        if ( dbufCount >= dbufSize ) return RETVAL_DATA_ERROR;
+        if (dbufCount >= dbufSize) return RETVAL_DATA_ERROR;
         i = nextSym - 1;
         uc = mtfSymbol[i];
         /* Adjust the MTF array.  Since we typically expect to move only a
@@ -487,19 +435,21 @@ got_huff_bits:
         {
             mtfSymbol[i] = mtfSymbol[i-1];
         }
-        while ( --i );
+        while (--i);
         mtfSymbol[0] = uc;
         uc = symToByte[uc];
-        /* We have our literal byte.  Save it into dbuf. */
+        /* We have our literal byte. Save it into dbuf. */
         byteCount[uc]++;
-        dbuf[dbufCount++] = ( unsigned int )uc;
+        dbuf[dbufCount++] = (unsigned int)uc;
     }
+
     /* At this point, we've read all the huffman-coded symbols (and repeated
           runs) for this block from the input stream, and decoded them into the
        intermediate buffer.  There are dbufCount many decoded bytes in dbuf[].
        Now undo the Burrows-Wheeler transform on dbuf.
        See http://dogma.net/markn/articles/bwt/bwt.htm
      */
+
     /* Turn byteCount into cumulative occurrence counts of 0 to n-1. */
     j = 0;
     for ( i = 0;i < 256;i++ )
@@ -508,21 +458,30 @@ got_huff_bits:
         byteCount[i] = j;
         j = k;
     }
-    /* Figure out what order dbuf would be in if we sorted it. */
+
+    /* Figure out what order dbuf would be in if we sorted it. 
+       
+       eugenyuk@gmail.com: it does the following:
+       1. takes the last octet of an element of dbuf[] array. A value is the
+       ASCII code of a character.
+       2. add an index of a current char of dbuf to the position where this
+       char should be located if dbuf array would be sorted out.
+       3. increment a position of current char for the next same char */
     for ( i = 0;i < dbufCount;i++ )
     {
-        uc = ( unsigned char )( dbuf[i] & 0xff );
-        dbuf[byteCount[uc]] |= ( i << 8 );
+        uc = (unsigned char)(dbuf[i] & 0xff);
+        dbuf[byteCount[uc]] |= (i << 8);
         byteCount[uc]++;
     }
+
     /* Decode first byte by hand to initialize "previous" byte.  Note that it
        doesn't get output, and if the first three characters are identical
        it doesn't qualify as a run (hence writeRunCountdown=5). */
-    if ( dbufCount )
+    if (dbufCount)
     {
-        if ( origPtr >= dbufCount ) return RETVAL_DATA_ERROR;
+        if (origPtr >= dbufCount) return RETVAL_DATA_ERROR;
         bd->writePos = dbuf[origPtr];
-        bd->writeCurrent = ( unsigned char )( bd->writePos & 0xff );
+        bd->writeCurrent = (unsigned char)(bd->writePos & 0xff);
         bd->writePos >>= 8;
         bd->writeRunCountdown = 5;
     }
@@ -537,8 +496,7 @@ got_huff_bits:
    error (all errors are negative numbers).  If out_fd!=-1, outbuf and len
    are ignored, data is written to out_fd and return is RETVAL_OK or error.
 */
-
-int read_bunzip( bunzip_data *bd, char *outbuf, int len )
+int read_bunzip(bunzip_data *bd, char *outbuf, int len)
 {
     const unsigned int *dbuf;
     int pos, current, previous, gotcount;
@@ -550,7 +508,7 @@ int read_bunzip( bunzip_data *bd, char *outbuf, int len )
        decoded, which results in this returning RETVAL_LAST_BLOCK, also
        equal to -1... Confusing, I'm returning 0 here to indicate no 
        bytes written into the buffer */
-    if ( bd->writeCount < 0 ) return 0;
+    if (bd->writeCount < 0) return 0;
 
     gotcount = 0;
     dbuf = bd->dbuf;
@@ -596,9 +554,9 @@ decode_next_byte:
             /* After 3 consecutive copies of the same byte, the 4th is a repeat
                count.  We count down from 4 instead
              * of counting up because testing for non-zero is faster */
-            if ( --bd->writeRunCountdown )
+            if (--bd->writeRunCountdown)
             {
-                if ( current != previous ) bd->writeRunCountdown = 4;
+                if (current != previous) bd->writeRunCountdown = 4;
             }
             else
             {
@@ -614,9 +572,9 @@ decode_next_byte:
         }
         /* Decompression of this block completed successfully */
         bd->writeCRC = ~bd->writeCRC;
-        bd->totalCRC = ( ( bd->totalCRC << 1 ) | ( bd->totalCRC >> 31 ) ) ^ bd->writeCRC;
+        bd->totalCRC = ( (bd->totalCRC << 1) | (bd->totalCRC >> 31) ) ^ bd->writeCRC;
         /* If this block had a CRC error, force file level CRC error. */
-        if ( bd->writeCRC != bd->headerCRC )
+        if (bd->writeCRC != bd->headerCRC)
         {
             bd->totalCRC = bd->headerCRC + 1;
             return RETVAL_LAST_BLOCK;
@@ -628,13 +586,13 @@ decode_next_byte:
     goto decode_next_byte;
 }
 
-int init_block( bunzip_data *bd )
+int init_block(bunzip_data *bd)
 {
     int status;
     /* Refill the intermediate buffer by huffman-decoding next block of input */
     /* (previous is just a convenient unused temp variable here) */
-    status = get_next_block( bd );
-    if ( status )
+    status = get_next_block(bd);
+    if (status)
     {
         bd->writeCount = status;
         return status;
@@ -646,15 +604,14 @@ int init_block( bunzip_data *bd )
 /* Allocate the structure, read file header.  If in_fd==-1, inbuf must contain
    a complete bunzip file (len bytes long).  If in_fd!=-1, inbuf and len are
    ignored, and data is read from file handle into temporary buffer. */
-int start_bunzip( bunzip_data **bdp, int in_fd, char *inbuf, int len )
+int start_bunzip(bunzip_data **bdp, int in_fd, char *inbuf, int len)
 {
     bunzip_data *bd;
     unsigned int i, j, c;
-    const unsigned int BZh0 = ( ( ( unsigned int )'B' ) << 24 ) + ( ( ( unsigned int )'Z' ) << 16 )
-                              + ( ( ( unsigned int )'h' ) << 8 ) + ( unsigned int )'0';
-
-    //printf("start_bunzip: &bd = %p, bd = %p, &bdp = %p, bdp = %p\n", &bd, bd, &bdp, bdp);
-    //printf("start_bunzip: &bd = %p, bd = %p\n", &bd, bd);
+    const unsigned int BZh0 = ( ( (unsigned int)'B' ) << 24 ) +
+                              ( ( (unsigned int)'Z' ) << 16 ) +
+                              ( ( (unsigned int)'h' ) << 8 ) +
+                              (unsigned int)'0';
 
     /* Figure out how much data to allocate */
     i = sizeof( bunzip_data );
@@ -662,32 +619,31 @@ int start_bunzip( bunzip_data **bdp, int in_fd, char *inbuf, int len )
     /* Allocate bunzip_data.  Most fields initialize to zero. */
     if ( !( bd = *bdp = malloc( i ) ) ) return RETVAL_OUT_OF_MEMORY;
     memset( bd, 0, sizeof( bunzip_data ) );
-	//printf("start_bunzip: bd = *bdp = malloc( i )\n");
-    //printf("start_bunzip: &bd = %p, bd = %p, &bdp = %p, bdp = %p, *bdp = %p\n", &bd, bd, &bdp, bdp, *bdp);
-    //printf("start_bunzip: &bd = %p, bd = %p\n", &bd, bd);
 
     /* Setup input buffer */
-    if ( -1 == ( bd->in_fd = in_fd ) )
+    if ( -1 == (bd->in_fd = in_fd) )
     {
         bd->inbuf = inbuf;
         bd->inbufCount = len;
     }
-    else bd->inbuf = ( unsigned char * )( bd + 1 );
+    else bd->inbuf = (unsigned char *)(bd + 1);
+
     /* Init the CRC32 table (big endian) */
-    for ( i = 0;i < 256;i++ )
+    for (i = 0; i < 256; i++)
     {
         c = i << 24;
-        for ( j = 8;j;j-- )
-            c = c & 0x80000000 ? ( c << 1 ) ^ 0x04c11db7 : ( c << 1 );
+        for (j = 8; j; j--)
+            c = c & 0x80000000 ? (c << 1) ^ 0x04c11db7 : (c << 1);
         bd->crc32Table[i] = c;
     }
+
     /* Setup for I/O error handling via longjmp */
     i = setjmp( bd->jmpbuf );
     if ( i ) return i;
 
     /* Ensure that file starts with "BZh['1'-'9']." */
     i = get_bits( bd, 32 );
-    if ( ( ( unsigned int )( i - BZh0 - 1 ) ) >= 9 ) return RETVAL_NOT_BZIP_DATA;
+    if ( ( (unsigned int)(i - BZh0 - 1) ) >= 9 ) return RETVAL_NOT_BZIP_DATA;
 
     /* Fourth byte (ascii '1'-'9'), indicates block size in units of 100k of
        uncompressed data.  Allocate intermediate buffer for block. */
@@ -704,22 +660,22 @@ int start_bunzip( bunzip_data **bdp, int in_fd, char *inbuf, int len )
 
 /* Example usage: decompress src_fd to dst_fd.  (Stops at end of bzip data,
    not end of file.) */
-extern int uncompressStream( int src_fd, int dst_fd )
+extern int uncompressStream(int src_fd, int dst_fd)
 {
     char *outbuf;
     bunzip_data *bd;
     int i;
 
-    if ( !( outbuf = malloc( IOBUF_SIZE ) ) ) return RETVAL_OUT_OF_MEMORY;
-    if ( !( i = start_bunzip( &bd, src_fd, 0, 0 ) ) )
+    if ( !( outbuf = malloc(IOBUF_SIZE) ) ) return RETVAL_OUT_OF_MEMORY;
+    if ( !(i = start_bunzip(&bd, src_fd, 0, 0)) )
     {
         for ( ;; )
         {
-            if ( ( ( i = init_block( bd ) ) < 0 ) ) break;
+            if ( ( ( i = init_block(bd) ) < 0 ) ) break;
             // fprintf( stderr, "init: %d\n", i );
             for ( ;; )
             {
-                if ( ( i = read_bunzip( bd, outbuf, IOBUF_SIZE ) ) <= 0 ) break;
+                if ( ( i = read_bunzip(bd, outbuf, IOBUF_SIZE) ) <= 0 ) break;
                 // fprintf( stderr, "read: %d\n", i );
                 if ( i != write( dst_fd, outbuf, i ) )
                 {
@@ -739,21 +695,21 @@ extern int uncompressStream( int src_fd, int dst_fd )
 
 #ifdef MICRO_BUNZIP_MAIN
 
-static char * const bunzip_errors[] =
-    {
-        NULL, "Bad file checksum", "Not bzip data",
-        "Unexpected input EOF", "Unexpected output EOF", "Data error",
-        "Out of memory", "Obsolete (pre 0.9.5) bzip format not supported."
-    };
+//static char * const bunzip_errors[] =
+//    {
+//        NULL, "Bad file checksum", "Not bzip data",
+//        "Unexpected input EOF", "Unexpected output EOF", "Data error",
+//        "Out of memory", "Obsolete (pre 0.9.5) bzip format not supported."
+//    };
 
 /* Dumb little test thing, decompress stdin to stdout */
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
-    int i = uncompressStream( 0, 1 );
+    int i = uncompressStream(0, 1);
     char c;
 
-    if ( i ) fprintf( stderr, "%d: %s\n", i, bunzip_errors[-i] );
-    else if ( read( 0, &c, 1 ) ) fprintf( stderr, "Trailing garbage ignored\n" );
+    if ( i ) fprintf(stderr, "%d: %s\n", i, bunzip_errors[-i]);
+    else if ( read( 0, &c, 1 ) ) fprintf(stderr, "Trailing garbage ignored\n");
     return -i;
 }
 
