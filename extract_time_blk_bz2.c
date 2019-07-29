@@ -1,6 +1,5 @@
 // author: Eugene Ivanyuk (eugene.ivanyuk@gmail.com)
 //
-// Legend:
 // dt - abbreviation for datetime
 
 
@@ -605,7 +604,7 @@ unsigned long opt_from_bin_search(off_t low, off_t high,
             }
 */
             break;
-	    }  
+	    }
     }
 
     return mid_pos;
@@ -861,7 +860,6 @@ seek_bunzip_finish:
 int seek_last_dt_str_in_blk(unsigned long pos, bunzip_data *bd, char * opt_f,
     bool * is_dt_str_found)
 {
-
     int status = 0, i = 0;
     int gotcount = 0;
     char obuf[BUFFER_SIZE];
@@ -1082,8 +1080,6 @@ const char * get_last_dt_str_from_bz2_blk(unsigned long pos, int test_substr_len
             obuf_pos = prev_nl_pos;
             continue;
         }
-        
-
     }
 
     return last_dt_str_in_outbuf;
