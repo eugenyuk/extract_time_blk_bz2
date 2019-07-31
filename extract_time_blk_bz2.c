@@ -53,12 +53,11 @@ const char * get_first_dt_str_from_bz2_blk(unsigned long, int, bunzip_data *,
                                             char *, const char *);
 const char * get_last_dt_str_from_bz2_blk(unsigned long, int, bunzip_data *,
                                             char *, const char *);
-bool dt_substr_in_str(char *, int, char *, int, const char *);
+bool is_dt_substr_in_str(char *, int, char *, int, const char *);
 unsigned long opt_from_bin_search(off_t, off_t, time_t, bunzip_data *, 
                                 const char *, int, char *, const char *);
-bool seek_dt_str_in_outbuf(const char *, int , const char *);
+bool is_dt_str_in_obuf(const char *, int , const char *);
 int seek_dt_str_in_blk(unsigned long, bunzip_data *, const char *, bool *);
-int seek_last_dt_str_in_blk(unsigned long, bunzip_data *, char *, bool *);
 int uncompress_blk(unsigned long, bunzip_data *);
 const char * def_dt_fmt(const char *);
 unsigned long long opt_from_first_blk_search(unsigned long long, bunzip_data *,
@@ -839,7 +838,7 @@ int seek_dt_str_in_blk(unsigned long pos, bunzip_data *bd, const char * opt_f,
 
             //printf("seek_dt_str_in_blk: iteration %d\n", i);
             // Search from/to strings in obuf. As soon as stings was found - stop checking further blocks.
-            if (*is_dt_str_found = seek_dt_str_in_outbuf(opt_f, gotcount, obuf))
+            if (*is_dt_str_found = is_dt_str_in_obuf(opt_f, gotcount, obuf))
             {
 		        //printf("seek_dt_str_in_blk: is_dt_str_found = %d\n", is_dt_str_found);
 		        goto seek_bunzip_finish;
@@ -856,75 +855,6 @@ seek_bunzip_finish:
 
 //    if ( bd->dbuf ) free( bd->dbuf );
 //    free( bd );
-    return status;
-}
-
-int seek_last_dt_str_in_blk(unsigned long pos, bunzip_data *bd, char * opt_f,
-    bool * is_dt_str_found)
-{
-    int status = 0, i = 0;
-    int gotcount = 0;
-    char obuf[BUFFER_SIZE];
-    int seek_bits_return;
-
-
-    //printf("seek_dt_str_in_blk: &bd = %p, bd = %p\n", &bd, bd);
-    
-    seek_bits_return = seek_bits( bd, pos );
-    //printf("seek_dt_str_in_blk: seek_bits returned %d\n", seek_bits_return);
-    //printf("seek_dt_str_in_blk: opt_f = %s\n", opt_f);
-
-    /* Fill the decode buffer for the block */
-    if ( ( status = get_next_block( bd ) ) )
-        goto seek_bunzip_finish;
-
-    /* Init the CRC for writing */
-    bd->writeCRC = 0xffffffffUL;
-
-    /* Zero this so the current byte from before the seek is not written */
-    bd->writeCopies = 0;
-
-    /* Decompress the block and write to stdout */
-    for ( ; ; i++ )
-    {
-        gotcount = read_bunzip( bd, obuf, BUFFER_SIZE );
-	    //printf("seek_dt_str_in_blk: read_bunzip returned %d\n", gotcount);
-        if ( gotcount < 0 )
-        {
-            status = gotcount;
-            break;
-        }
-        else if ( gotcount == 0 )
-        {
-            break;
-        }
-        else if ( gotcount == BUFFER_SIZE )  // if gotcount == BUFFER_SIZE then we suppose this is not the last buffer of block. So continue to the next buffer.
-	    {
-	        continue;
-	    }
-        else
-        {
-            // Here we have an uncompressed data in the last buffer
-
-            //printf("seek_dt_str_in_blk: iteration %d\n", i);
-            // Search from/to strings in obuf. As soon as stings was found - stop checking further blocks.
-            //if (*is_dt_str_found = seek_dt_str_in_outbuf(opt_f, gotcount, obuf)) {
-		    //printf("seek_dt_str_in_blk: is_dt_str_found = %d\n", is_dt_str_found);
-		//    goto seek_bunzip_finish;
-		//}
-                //printf("seek_dt_str_in_blk: iteration %d, gotcount = %d\n", i, gotcount);
-
-
-                write( 1, obuf, gotcount );
-                //exit(EXIT_SUCCESS);
-        }
-    }
-
-seek_bunzip_finish:
-
-//    if ( bd->dbuf ) free( bd->dbuf );
-//    free( bd );
-
     return status;
 }
 
@@ -990,8 +920,8 @@ get_first_dt_str_from_bz2_blk(  unsigned long   pos,
         if (str_len <= test_substr_len)
             continue;
 
-        bool status = dt_substr_in_str(str, str_len, test_substr, test_substr_len,
-                                        dt_fmt);
+        bool status = is_dt_substr_in_str(str, str_len, test_substr,
+            test_substr_len, dt_fmt);
         if (status)
         {
             // Copy test_substr to first_dt_str_in_outbuf and return it.
@@ -1071,13 +1001,14 @@ get_last_dt_str_from_bz2_blk(   unsigned long   pos,
         // go to the previous string
         str_len = strlen(str);
         if (str_len <= test_substr_len)
-        {   // go to the previous newline
+        {   debug_print("str_len = %d\n", str_len);
+            // go to the previous newline
             obuf_pos = prev_nl_pos; 
             continue;
         }
 
-        bool status = dt_substr_in_str(str, str_len, test_substr, test_substr_len,
-                                        dt_fmt);
+        bool status = is_dt_substr_in_str(str, str_len, test_substr,
+                            test_substr_len, dt_fmt);
         if (status)
         {
             // Copy test_substr to first_dt_str_in_outbuf and return it.
@@ -1096,13 +1027,13 @@ get_last_dt_str_from_bz2_blk(   unsigned long   pos,
 }
 
 
-bool seek_dt_str_in_outbuf(const char * dt_str, int gotcount, const char * obuf)
+bool is_dt_str_in_obuf(const char * dt_str, int gotcount, const char * obuf)
 {
     int obuf_pos, dt_byte_pos;
     int len_dt_str = strlen(dt_str);
     char found_dt_str[len_dt_str];
 
-//    printf("seek_dt_str_in_outbuf: dt_str = %s\n\n", dt_str);
+//    printf("is_dt_str_in_obuf: dt_str = %s\n\n", dt_str);
 
     dt_byte_pos = 0;
 
@@ -1132,13 +1063,13 @@ bool seek_dt_str_in_outbuf(const char * dt_str, int gotcount, const char * obuf)
             // check if the rest are also matched
             if (dt_byte_pos >= 1 && dt_byte_pos <= len_dt_str ) 
             {
-                //printf("seek_dt_str_in_outbuf: dt_str[%d] = obuf[%d] = %c\n",
+                //printf("is_dt_str_in_obuf: dt_str[%d] = obuf[%d] = %c\n",
                 //        dt_byte_pos, obuf_pos, obuf[obuf_pos]);
                 dt_byte_pos++;
 
                 if (dt_byte_pos == len_dt_str)
 		        {
-                    //printf("seek_dt_str_in_outbuf: match! dt_str = %s\n", dt_str);
+                    //printf("is_dt_str_in_obuf: match! dt_str = %s\n", dt_str);
                     return true;
                 }
 	       
@@ -1207,7 +1138,8 @@ seek_bunzip_finish:
 }
 
 
-/* Converts char datetime string to epoch time (seconds since Jan 1 1970 00:00:00 UTC) */
+/* Converts char datetime string to epoch time (seconds since 
+   Jan 1 1970 00:00:00 UTC) */
 time_t convert_dt_str_to_epoch(const char * dt_str, const char * dt_fmt)
 {
     // dt data structures to which opt_f, opt_to should be converted
@@ -1227,7 +1159,7 @@ time_t convert_dt_str_to_epoch(const char * dt_str, const char * dt_fmt)
     //         int tm_isdst;  /* Daylight saving time */
     // };
 
-    //printf("convert_dt_str_to_epoch: dt_fmt = %s, dt_str = %s\n", dt_fmt, dt_str);
+    debug_print("dt_fmt = %s, dt_str = %s\n", dt_fmt, dt_str);
     if ( NULL == strptime(dt_str, dt_fmt, &dt_tm) )
     {
         error_print("strptime(dt_str, dt_fmt, &dt_tm) "
@@ -1422,8 +1354,8 @@ char * get_str(char *buf, int *buf_pos, char *str)
 }
 
 
-bool dt_substr_in_str(char * str, int str_len, char * test_substr,
-                                int test_substr_len, const char * dt_fmt)
+bool is_dt_substr_in_str(  char * str, int str_len, char * test_substr,
+                        int test_substr_len, const char * dt_fmt)
 {
     // Char position in a string
     int str_pos;
@@ -1448,6 +1380,8 @@ bool dt_substr_in_str(char * str, int str_len, char * test_substr,
         // Add null char to the end of test_substr to make it C string
         test_substr[test_substr_len] = '\0';
     
+        if (strlen(test_substr) < test_substr_len) return false;
+
         //debug_print("obuf_pos = %d", obuf_pos);
         //debug_print("test_substr = \"%s\"", test_substr);
 
