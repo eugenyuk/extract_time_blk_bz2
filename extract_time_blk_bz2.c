@@ -42,7 +42,7 @@ const char * DATETIME_FORMATS[] =
      "%d/%b/%Y:%H:%M:%S" }; /* "12/Dec/2015:18:39:27" */
 
 // Functions declaration
-void process_args(int, char [], unsigned long long *, char *);
+void process_opts(int, char *[], const char **, const char **, const char **);
 void usage(char *);
 long long unsigned search_start_bit_of_bz2_blk(bunzip_data *);
 // converts char string to epoch time (seconds since Jan 1 1970 00:00:00 UTC)
@@ -67,18 +67,10 @@ off_t lseek_set(bunzip_data *, off_t);
 char * get_str(char *, int *, char *);
 
 
-static const struct option long_options[] = {
-    { "from", required_argument, NULL, 'b' },
-    { "to", required_argument, NULL, 'e' },
-    { "file", required_argument, NULL, 'f' },
-    { NULL, 0, NULL, 0 }
-};
-
-
 int main(int argc, char *argv[])
 {
 // Variables declaration:
-    int ifd, opt, status, dt_substr_len;
+    int ifd, status, dt_substr_len;
     off_t file_size;
     // options --from, --to, --file
     const char *opt_f, *opt_to, *opt_input_file;	
@@ -91,39 +83,18 @@ int main(int argc, char *argv[])
     off_t last_blk_pos;
     // stores the time_t values of opt_f, opt_to strings
     time_t opt_from_time_t, opt_to_time_t, first_dt_str_in_outbuf_time_t;
-    const char * opt_from_dt_fmt;
-    const char * opt_to_dt_fmt;
-    const char * dt_fmt;
+    const char *opt_from_dt_fmt;
+    const char *opt_to_dt_fmt;
+    const char *dt_fmt;
     bool is_dt_str_found = false;
     // first/last dates in the input file
-    const char * file_first_date, * file_last_date;	
+    const char *file_first_date, *file_last_date;	
     // first/last dates converted to time_t
     time_t file_first_date_time_t, file_last_date_time_t;		
 
 
-// Parse the options and assign its values to variables
-    while ( (opt = getopt_long(argc, argv, "", long_options, NULL)) != -1 )
-    {
-        //printf("opt = %c\n", opt);
-      
-        switch (opt)
-	    {
-            case 'b':
-                opt_f = optarg;
-		//printf("main(): opt_f = %s, &opt_f = %x\n", opt_f, &opt_f);
-                break;
-            case 'e':
-                opt_to = optarg;
-		//printf("main(): opt_to = %s, &opt_to = %x\n", opt_to, &opt_to);
-                break;
-            case 'f':
-                opt_input_file = optarg;
-                break;
-            default: /* '?' */
-		        usage(argv[0]);
-                exit(EXIT_FAILURE);
-        }
-    }
+// Process arguments
+    process_opts(argc, argv, &opt_f, &opt_to, &opt_input_file);
 
 // Open an input bz2 file
     if ((ifd = open(opt_input_file ,O_RDONLY)) < 0)
@@ -310,7 +281,8 @@ int main(int argc, char *argv[])
     {
         debug_print("opt_to value %s was found in the block %llu", 
                     opt_to, cur_rel_bz2_blk_pos + bd->cur_file_offset * 8);
-	    bd->cur_file_offset = lseek(bd->in_fd, bd->cur_file_offset + cur_rel_bz2_blk_pos / 8 + 1, SEEK_SET);
+	    bd->cur_file_offset = lseek(bd->in_fd, bd->cur_file_offset + 
+            cur_rel_bz2_blk_pos / 8 + 1, SEEK_SET);
 	    cur_rel_bz2_blk_pos = search_start_bit_of_bz2_blk(bd);
 	    seek_dt_str_in_blk(cur_rel_bz2_blk_pos, bd, opt_to, &is_dt_str_found);
     }
@@ -323,6 +295,66 @@ the_end:
     printf("\n");
 
     return 0;
+}
+
+
+void process_opts(int argc, char *argv[], const char **opt_f,
+                    const char **opt_to, const char **opt_input_file)
+{
+    int getopt_res;
+    struct opt {
+        bool is_set;    // was option set?
+        char *name;     // option name
+    };
+    
+    const struct option long_options[] = {
+        {"from",   required_argument,  NULL,   'b'},
+        {"to",     required_argument,  NULL,   'e'},
+        {"file",   required_argument,  NULL,   'f'},
+        {NULL,     0,                  NULL,   0  }
+    };
+
+    struct opt mandat_opts[] = { 
+        {false, ""      },
+        {false, "--from"},
+        {false, "--to"  },
+        {false, "--file"} 
+    };
+
+    // Parse the options and assign its values to variables
+    while ( (getopt_res = getopt_long(argc, argv, "", long_options, NULL)) != -1 )
+    {
+        //printf("opt = %c\n", opt);
+        switch (getopt_res)
+	    {
+            case 'b':
+                *opt_f = optarg;
+                mandat_opts[1].is_set = true;
+                break;
+            case 'e':
+                *opt_to = optarg;
+                mandat_opts[2].is_set = true;
+		        break;
+            case 'f':
+                *opt_input_file = optarg;
+                mandat_opts[3].is_set = true;
+                break;
+            default: /* '?' */
+		        usage(argv[0]);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    for (int i = 1; i <= 3; i++)
+    {
+        if (mandat_opts[i].is_set == false) 
+        {
+            error_print("missing %s option", mandat_opts[i].name);
+            usage(argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+    
 }
 
 
