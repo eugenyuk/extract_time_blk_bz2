@@ -378,11 +378,12 @@ long long find_last_blk_pos(bunzip_data *bd)
 
 
 unsigned long long opt_from_first_blk_search(unsigned long long opt_from_pos, 
-                                             bunzip_data *bd, const char * opt_f)
+                                             bunzip_data *bd,
+                                             const char * opt_f)
 {
-    long long backward_offset_step, cur_rel_bz2_blk_pos;
-    long long prev_rel_bz2_blk_pos, cur_abs_bz2_blk_pos, prev_abs_bz2_blk_pos; 
-    long long abs_backward_offset_B;
+    long long prev_rel_bz2_blk_pos, cur_rel_bz2_blk_pos;
+    long long prev_abs_bz2_blk_pos, cur_abs_bz2_blk_pos;
+    long long backward_offset_step, abs_backward_offset_B;
     int status;
     bool is_dt_str_found = true;
     long prev_file_offset;
@@ -898,7 +899,7 @@ get_first_dt_str_from_bz2_blk(  unsigned long   pos,
                                 int             test_substr_len,
                                 bunzip_data*    bd,
                                 char*           first_dt_str_in_outbuf,
-                                const char*     dt_fmt)
+                                const char*     dt_fmt  )
 {
     // byte/char position within obuf
     int obuf_pos;
@@ -973,7 +974,7 @@ get_last_dt_str_from_bz2_blk(   unsigned long   pos,
                                 int             test_substr_len, 
                                 bunzip_data*    bd,
                                 char*           last_dt_str_in_outbuf,
-                                const char*     dt_fmt)
+                                const char*     dt_fmt  )
 {
     // byte/char position within obuf
     int obuf_pos;
