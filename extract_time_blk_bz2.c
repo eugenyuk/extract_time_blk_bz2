@@ -810,10 +810,6 @@ int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *t
 	    }
 	    else if (gotcount == 0 && totalcount == 0)
         {
-/*        else if ( gotcount == 0 ) { // if gotcount == 0 obuf is not rewritten, so it contains previous buffer data
-            if ( prev_gotcount > 0 ) {// if prev_gotcount is not empty this obuf is the last one in this block
-                break;
-            } */
 	        // If the first read_bunzip() wrote 0 bytes into last_outbuf, exit with error.
 	        status = gotcount;
 	        debug_print("read_bunzip() returned %d uncompressing the block %llu. %s",
@@ -1289,17 +1285,10 @@ unsigned long long search_start_bit_of_bz2_blk(bunzip_data *bd)
 	putchar('\n');    
     } */
 
-    //printf("search_start_bit_of_bz2_blk: lseek position BEFORE read() = %lu\n",
-    //       lseek(bd->in_fd, 0, SEEK_CUR));
-
     // Search a needle starting from every next bit. Read BUFFER_SIZE bytes from
     // an input file to an inbuf buffer.
     while ((inbuf_read = read(bd->in_fd, inbuf, BUFFER_SIZE)) > 0)
     {
-    //printf("search_start_bit_of_bz2_blk: lseek position AFTER read() = %lu\n",
-    //         lseek(bd->in_fd, 0, SEEK_CUR));
-	//printf("inbuf_read = %d\n", inbuf_read);
-	
 	// Take every byte from inbuf and put it into a hay. During every iteration
     // the most right byte of a hay is shifted to the left and a new byte from
     // inbuf is put to the hay. Inside hay shift every byte from right to left
@@ -1309,19 +1298,21 @@ unsigned long long search_start_bit_of_bz2_blk(bunzip_data *bd)
 //	    printf("search_start_bit_of_bz2_blk: inbuf_read_total = %d\n", inbuf_read_total);
 //          printf("hay = (hay << 8) | inbuf[%d] = \t", inbuf_byte_pos);
             
-            // Shift the content of hay one byte to the left and put a new byte from inbuf to the most right position
+            // Shift the content of hay one byte to the left and put a new byte
+            // from inbuf to the most right position
 	        hay = (hay << 8) | inbuf[inbuf_byte_pos];
 	        //printf("%40s\n", dec_to_bin_ll(hay));
 	        if (inbuf_byte_pos >= 6)
 	        {
                 for (int i = 0; i <= 8; i++)
                 {
-//		    printf("hay = \t\t\t\t%s\n", dec_to_bin_ll(hay));
+    //		    printf("hay = \t\t\t\t%s\n", dec_to_bin_ll(hay));
     //		    printf("masks[%d] = \t\t\t%s\n", i, dec_to_bin_ll(masks[i]));
     //		    printf("hay & masks[%d] = \t\t%s\n", i, dec_to_bin_ll(hay & masks[i]));
     //		    printf("needle_shifted[%d] = \t\t%s\n", i, dec_to_bin_ll(needle_shifted[i]));
 
-	            if ( (hay & masks[i]) == needle_shifted[i] ) // if needle was found, define correct position
+                // if a needle was found, define correct position
+	            if ( (hay & masks[i]) == needle_shifted[i] )
 		        {
 		            if (i == 0) 
                     {

@@ -31,7 +31,11 @@
 
 
 #include "micro-bunzip.h"
+#include <time.h>   // clock_t
+#include <omp.h>
 
+clock_t time_sample;
+double cpu_time_used, cpu_time_used_total;
 
 /* Return the next nnn bits of input.  All reads from the compressed input
    are done through this function.  All reads are big endian */
@@ -231,8 +235,12 @@ int get_next_block(bunzip_data *bd)
                 if (length[t] == i) hufGroup->permute[pp++] = t;
         }
 
+    /*  printf("permute = ");
+        for (i = 0; i <= pp; i++) printf("%d ", hufGroup->permute[i]);
+        puts("");
+    */
         /* Count symbols coded for at each bit length */
-        for (i = 0; i < symCount; i++) 
+        for (i = 0; i < symCount; i++)
             temp[length[i]]++;
         
         /* Calculate limit[] (the largest symbol-coding value at each bit
@@ -252,11 +260,36 @@ int get_next_block(bunzip_data *bd)
             limit[i] = ( pp << (maxLen - i) ) - 1;
             pp <<= 1;
             base[i+1] = pp - (t += temp[i]);
+
+            /* eugenyuk@gmail.com, 
+                3 >= i <= 13
+
+                i       n       limit[i]                base[i]
+                3       5       0001 0011 1111 1111                       0
+                4       5       0001 1101 1111 1111                     101
+                5       1       0001 1110 1111 1111                  1 0100
+                6       0       0001 1110 1111 1111                 11 0011
+                7       1       0001 1111 0011 1111                111 0001
+                8       0       0001 1111 0011 1111               1110 1110
+                9       3       0001 1111 0110 1111             1 1110 1000
+                10      1       0001 1111 0111 0111            11 1101 1111
+                11      1       0001 1111 0111 1011           111 1100 1110
+                12      58      0001 1111 1110 1111          1111 1010 1101
+                                0001 1111 1111 1111        1 1111 1010 0101
+                13      16      0111 1111 1111 1111 1111 1111 1111 1111 */
         }
         limit[maxLen+1] = INT_MAX; /* Sentinal value for reading next sym. */
         limit[maxLen] = pp + temp[maxLen] - 1;
         base[minLen] = 0;
+
+    /*     for (i = minLen; i <= maxLen; i++) {
+            printf("limit[%d] = %d\n", i, limit[i] >> (maxLen - i));
+            printf("base[%d] = %d\n", i, base[i]);
+        }
+        */
     }
+    // TOOK ~0.05ms/call
+
     /* We've finished reading and digesting the block header.  Now read this
        block's huffman coded symbols from the file and undo the huffman coding
        and run length encoding, saving the result into dbuf[dbufCount++]=uc */
@@ -268,6 +301,9 @@ int get_next_block(bunzip_data *bd)
         mtfSymbol[i] = (unsigned char)i;
     }
 
+
+/*=== START ===*/
+    //printf("tree\tminlen\tmaxlen\tcurlen\tsymbol\tpermutes\n");
     /* Loop through compressed symbols. */
     runPos = dbufCount = symCount = selector = 0;
     for ( ;; )
@@ -281,6 +317,7 @@ int get_next_block(bunzip_data *bd)
             base = hufGroup->base - 1;
             limit = hufGroup->limit - 1;
         }
+        //printf("%d\t", selectors[selector-1]);
         /* Read next huffman-coded symbol. */
         /* Note: It is far cheaper to read maxLen bits and back up than it is
            to read minLen bits and then an additional bit at a time, testing
@@ -307,6 +344,7 @@ int get_next_block(bunzip_data *bd)
 got_huff_bits:
         /* Figure how many bits are in next symbol and unget extras */
         i = hufGroup->minLen;
+
         while (j > limit[i]) ++i;
         bd->inbufBitCount += (hufGroup->maxLen - i);
         /* Huffman decode value to get nextSym (with bounds checking) */
@@ -314,9 +352,14 @@ got_huff_bits:
                 || ( ( (unsigned)(j = ( j >> (hufGroup->maxLen - i) ) - base[i]) )
                      >= MAX_SYMBOLS ) )
             return RETVAL_DATA_ERROR;
+        //printf("%d\t%d\t%d\t%d", hufGroup->minLen, hufGroup->maxLen, i, j);
+        //printf("j = %d\t", j);
         nextSym = hufGroup->permute[j];
+        //printf("%u\n", nextSym);
+        // End of huffman decoding stage
+
         /* We have now decoded the symbol, which indicates either a new literal
-           byte, or a repeated run of the most recent literal byte.  First,
+           byte, or a repeated run of the most recent literal byte. First,
            check if nextSym indicates a repeated run, and if so loop collecting
            how many times to repeat the last literal. */
         if ( ( (unsigned)nextSym ) <= SYMBOL_RUNB )
@@ -329,12 +372,15 @@ got_huff_bits:
             }
             /* Neat trick that saves 1 symbol: instead of or-ing 0 or 1 at
                each bit position, add 1 or 2 instead.  For example,
-               1011 is 1<<0 + 1<<1 + 2<<2.  1010 is 2<<0 + 2<<1 + 1<<2.
+               1011 is 1<<0 + 1<<1 + 2<<2. 1010 is 2<<0 + 2<<1 + 1<<2.
                You can make any bit pattern that way using 1 less symbol than
                the basic or 0/1 method (except all bits 0, which would use no
                symbols, but a run of length 0 doesn't mean anything in this
-               context).  Thus space is saved. */
+               context). Thus space is saved. */
             t += (runPos << nextSym); /* +runPos if RUNA; +2*runPos if RUNB */
+            //printf("runPos = %d ", runPos);
+            //printf("nextSym = %d ", nextSym);
+            //printf("t = %d\n", t);
             runPos <<= 1;
             continue;
         }
@@ -344,6 +390,7 @@ got_huff_bits:
            literal used is the one at the head of the mtfSymbol array.) */
         if (runPos)
         {
+            //printf("%d\n", t);
             runPos = 0;
             if (dbufCount + t >= dbufSize) return RETVAL_DATA_ERROR;
 
@@ -356,7 +403,7 @@ got_huff_bits:
 
         /* At this point, nextSym indicates a new literal character.  Subtract
            one to get the position in the MTF array at which this literal is
-           currently to be found.  (Note that the result can't be -1 or 0,
+           currently to be found. (Note that the result can't be -1 or 0,
            because 0 and 1 are RUNA and RUNB.  But another instance of the
            first symbol in the mtf array, position 0, would have been handled
            as part of a run above. Therefore 1 unused mtf position minus
@@ -380,8 +427,16 @@ got_huff_bits:
         dbuf[dbufCount++] = (unsigned int)uc;
     }
 
+    //for (i = 0; i < dbufCount;     i++)
+    //    printf("%d ", dbuf[i]);
+
+/*=== TOOK ~11ms ===*/
+
+    //for (i = 0; i < 256; i++)
+    //    printf("byteCount[%d] = %d\n", i, byteCount[i]);
+
     /* At this point, we've read all the huffman-coded symbols (and repeated
-          runs) for this block from the input stream, and decoded them into the
+       runs) for this block from the input stream, and decoded them into the
        intermediate buffer.  There are dbufCount many decoded bytes in dbuf[].
        Now undo the Burrows-Wheeler transform on dbuf.
        See http://dogma.net/markn/articles/bwt/bwt.htm
@@ -389,13 +444,22 @@ got_huff_bits:
 
     /* Turn byteCount into cumulative occurrence counts of 0 to n-1. */
     j = 0;
-    for ( i = 0;i < 256;i++ )
+    for (i = 0; i < 256; i++)
     {
         k = j + byteCount[i];
         byteCount[i] = j;
         j = k;
     }
 
+    //FILE *pf;
+    //pf = fopen("byteCount.out", "w");
+    //for (i = 0; i < 256; i++)
+    //    fprintf(pf, "byteCount[%d] = %d\n", i, byteCount[i]);
+    //fclose(pf);
+
+/*=== START */
+time_sample = clock(); 
+/* ===*/
     /* Figure out what order dbuf would be in if we sorted it. 
        
        eugenyuk@gmail.com: it does the following:
@@ -404,12 +468,34 @@ got_huff_bits:
        2. add an index of a current char of dbuf to the position where this
        char should be located if dbuf array would be sorted out.
        3. increment a position of current char for the next same char */
-    for ( i = 0;i < dbufCount;i++ )
+
+    //#pragma omp parallel for private(uc) num_threads(2)
+    for (i = 0; i < dbufCount; i++)
     {
+        //printf("i = %d\n", i);
         uc = (unsigned char)(dbuf[i] & 0xff);
+    //    #pragma omp atomic
         dbuf[byteCount[uc]] |= (i << 8);
+        //printf("uc = %d\n", uc);
+        //printf("byteCount[uc] = %d\n", byteCount[uc]);
+        //printf("dbuf[byteCount[uc]] = %d\n\n", dbuf[byteCount[uc]]);
+    //    #pragma omp atomic
         byteCount[uc]++;
     }
+/* 
+    FILE *pf;
+    pf = fopen("dbuf.out.mult", "w");
+    for (i = 0; i < dbufCount; i++)
+        fprintf(pf, "dbuf[%d] = %d %d %d\n", i, dbuf[i] >> 8, dbuf[i] & 0xff, dbuf[i]);
+
+    fclose(pf);
+*/
+/*=== TOOK ~8ms
+    time_sample = clock() - time_sample;
+    cpu_time_used = ((double)time_sample/CLOCKS_PER_SEC*1000);
+    cpu_time_used_total += cpu_time_used;
+    printf("%s: took %f ms/call\n", __func__, cpu_time_used_total/24);
+===*/
 
     /* Decode first byte by hand to initialize "previous" byte.  Note that it
        doesn't get output, and if the first three characters are identical
@@ -424,13 +510,16 @@ got_huff_bits:
     }
     bd->writeCount = dbufCount;
 
+
+// TOOK ~8ms/call
+
     return RETVAL_OK;
 }
 
 /* Undo burrows-wheeler transform on intermediate buffer to produce output.
    If start_bunzip was initialized with out_fd=-1, then up to len bytes of
-   data are written to outbuf.  Return value is number of bytes written or
-   error (all errors are negative numbers).  If out_fd!=-1, outbuf and len
+   data are written to outbuf. Return value is number of bytes written or
+   error (all errors are negative numbers). If out_fd!=-1, outbuf and len
    are ignored, data is written to out_fd and return is RETVAL_OK or error.
 */
 int read_bunzip(bunzip_data *bd, char *outbuf, int len)
@@ -456,7 +545,7 @@ int read_bunzip(bunzip_data *bd, char *outbuf, int len)
        buffer unless this is the very first call (in which case we haven't
        huffman-decoded a block into the intermediate buffer yet). */
 
-    if ( bd->writeCopies )
+    if (bd->writeCopies)
     {
         /* Inside the loop, writeCopies means extra copies (beyond 1) */
         --bd->writeCopies;
@@ -473,8 +562,8 @@ int read_bunzip(bunzip_data *bd, char *outbuf, int len)
                 return len;
             }
             outbuf[gotcount++] = current;
-            bd->writeCRC = ( ( ( bd->writeCRC ) << 8 )
-                             ^ bd->crc32Table[( ( bd->writeCRC )>>24 )^current] );
+            bd->writeCRC = ( ( (bd->writeCRC) << 8 )
+                             ^ bd->crc32Table[( (bd->writeCRC)>>24 )^current] );
             /* Loop now if we're outputting multiple copies of this byte */
             if ( bd->writeCopies )
             {
@@ -490,7 +579,7 @@ decode_next_byte:
             pos >>= 8;
             /* After 3 consecutive copies of the same byte, the 4th is a repeat
                count.  We count down from 4 instead
-             * of counting up because testing for non-zero is faster */
+               of counting up because testing for non-zero is faster */
             if (--bd->writeRunCountdown)
             {
                 if (current != previous) bd->writeRunCountdown = 4;
@@ -548,7 +637,7 @@ int start_bunzip(bunzip_data **bdp, int in_fd, char *inbuf, int len)
     const unsigned int BZh0 = ( ( (unsigned int)'B' ) << 24 ) +
                               ( ( (unsigned int)'Z' ) << 16 ) +
                               ( ( (unsigned int)'h' ) << 8 ) +
-                              (unsigned int)'0';
+                                  (unsigned int)'0';
 
     /* Figure out how much data to allocate */
     i = sizeof( bunzip_data );
