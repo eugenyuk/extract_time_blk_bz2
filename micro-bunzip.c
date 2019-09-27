@@ -612,20 +612,6 @@ decode_next_byte:
     goto decode_next_byte;
 }
 
-int init_block(bunzip_data *bd)
-{
-    int status;
-    /* Refill the intermediate buffer by huffman-decoding next block of input */
-    /* (previous is just a convenient unused temp variable here) */
-    status = get_next_block(bd);
-    if (status)
-    {
-        bd->writeCount = status;
-        return status;
-    }
-    bd->writeCRC = 0xffffffffUL;
-    return RETVAL_OK;
-}
 
 /* Allocate the structure, read file header.  If in_fd==-1, inbuf must contain
    a complete bunzip file (len bytes long).  If in_fd!=-1, inbuf and len are
