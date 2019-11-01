@@ -19,9 +19,4 @@ Where supported from/to datetime formats are:
 - "%Y-%m-%d %H:%M:%S" (Ex. "2017-02-21 14:53:22")
 
 ### Limitations:
-It was used on x64 architecture.
-Datatime substring in a log should be at the beginning of a string. For ex.:
-`2018-12-02T21:38:29 text text text ...`
-
-`2018-12-02T21:38:30 text text text ...`
-
+It was used on Linux x64 architecture only. It doesn't work on Windows.
