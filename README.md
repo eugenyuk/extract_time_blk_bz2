@@ -1,6 +1,6 @@
 # extract_time_blk_bz2
 
-This tool is useful when you need to get a part of a huge log file which was compressed with bzip2 (hundreds of gigabytes). The part of tool, which extracts bz2 blocks was given from the project of James Taylor [seek-bzip2](https://bitbucket.org/james_taylor/seek-bzip2). 
+This tool is useful when you need to get a part of a huge (hundreds of gigabytes) log file which was compressed with bzip2. The part of tool, which extracts bz2 block was given from the project of James Taylor [seek-bzip2](https://bitbucket.org/james_taylor/seek-bzip2). 
 
 I've added a possibility to extract only that bz2 blocks, which contains a data between --from and --to timestamps in a log.
 
