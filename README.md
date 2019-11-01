@@ -6,11 +6,11 @@ I've added a possibility to extract only that bz2 blocks, which contains a data 
 
 
 ### How to comile:
-`make`
+`> make`
 
 
 ### How to use a tool:
-`extract_time_blk_bz2 --from="datetime" --to="datetime" --file="/full/path/to/file.bz2"`
+`> extract_time_blk_bz2 --from="datetime" --to="datetime" --file="/full/path/to/file.bz2"`
 
 Supported from/to datetime formats are:
 
