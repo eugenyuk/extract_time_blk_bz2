@@ -20,5 +20,6 @@ Where supported from/to datetime formats are:
     "%d/%b/%Y:%H:%M:%S" (Ex. "12/Dec/2015:18:39:27") 
 
 ### Limitations:
-It was used on x64 architecture.
-Doesn't work on Windows because there is no strptime() function
+It was successfully tested on x64 architecture.
+
+Doesn't work on Windows because there is no strptime() function (at least)
