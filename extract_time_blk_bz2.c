@@ -69,7 +69,7 @@ char * get_str(char *, int *, char *);
 
 int main(int argc, char *argv[])
 {
-// Variables declaration:
+    // Variables declaration:
     int ifd, status, dt_substr_len;
     off_t file_size;
     // options --from, --to, --file
@@ -93,10 +93,10 @@ int main(int argc, char *argv[])
     time_t file_first_date_time_t, file_last_date_time_t;		
 
 
-// Process arguments
+    // Process arguments
     process_opts(argc, argv, &opt_f, &opt_to, &opt_input_file);
 
-// Open an input bz2 file
+    // Open an input bz2 file
     if ((ifd = open(opt_input_file ,O_RDONLY)) < 0)
     {
 	    //printf("main(), ERROR: open(opt_input_file ,O_RDONLY) < 0\n");
@@ -105,20 +105,21 @@ int main(int argc, char *argv[])
 	    exit(EXIT_FAILURE);
     }
 
-// Check if the input file is in bzip2 format, prepare bd structure for work.
+    // Check if the input file is in bzip2 format, prepare bd structure for
+    // work.
     if (status = start_bunzip(&bd, ifd, 0, 0))
     {
         error_print("start_bunzip() returned: %s\n", bunzip_errors[-status]);
 	    exit(EXIT_FAILURE);
     }
 
-// Define datetime formats of --from and --to arguments and check if they are
-// equal.
+    // Define datetime formats of --from and --to arguments and check if they
+    // are equal.
     opt_from_dt_fmt = def_dt_fmt(opt_f);
-    //printf("%s(): opt_f = \"%s\", datetime format = \"%s\"\n",
+    // printf("%s(): opt_f = \"%s\", datetime format = \"%s\"\n",
     //     __func__, opt_f, opt_from_dt_fmt);
     opt_to_dt_fmt = def_dt_fmt(opt_to);
-    //printf("%s(): opt_to =   \"%s\", dt format = \"%s\"\n",
+    // printf("%s(): opt_to =   \"%s\", dt format = \"%s\"\n",
     //  __func__, opt_to, opt_to_dt_fmt);
     
     // Check if opt_f datetime format equals to opt_to datetime format
@@ -131,11 +132,11 @@ int main(int argc, char *argv[])
     dt_fmt = opt_from_dt_fmt;
     //exit(EXIT_SUCCESS
 
-// Convert opt_f, opt_to strings to epoch time to compare them
+    // Convert opt_f, opt_to strings to epoch time to compare them
     opt_from_time_t = convert_dt_str_to_epoch(opt_f, dt_fmt);
     opt_to_time_t = convert_dt_str_to_epoch(opt_to, dt_fmt);
 
-// Check if opt_f >= opt_to
+    // Check if opt_f >= opt_to
     if ( opt_from_time_t >= opt_to_time_t )
     {
         error_print("%s\n", "Value of --from shouldn't be >= value of --to");
@@ -152,16 +153,14 @@ int main(int argc, char *argv[])
     // last datetime substring that was found in the last output buffer 
     char last_dt_str_in_outbuf[dt_substr_len + 1];
 
-// Check if opt_f, opt_to are not outside the period, covered by an input file
-    // get the first datetime substring (first_dt_str_in_outbuf) from the 
+    // Check if opt_f, opt_to are not outside the period, covered by an input
+    // file get the first datetime substring (first_dt_str_in_outbuf) from the 
     // first block of a file
 
     file_first_date = get_first_dt_str_from_bz2_blk(FIRST_BLK_POS, dt_substr_len, 
-                                                  bd, first_dt_str_in_outbuf, 
-                                                  dt_fmt);
-    
-    debug_print("file_first_date (block %d) is: %s", 
-                FIRST_BLK_POS, file_first_date);
+        bd, first_dt_str_in_outbuf, dt_fmt);
+    debug_print("file_first_date (block %d) is: %s", FIRST_BLK_POS,
+        file_first_date);
     
     file_first_date_time_t = convert_dt_str_to_epoch(file_first_date, dt_fmt);
     //debug_print("file_first_date_time_t = %d", file_first_date_time_t);
@@ -194,13 +193,13 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-// Define a file size 
+    // Define a file size 
     file_size = lseek(bd->in_fd, 0, SEEK_END);
     
     //printf("%s(): lseek position BEFORE opt_from_bin_search = %lu\n",
     //        __func__, lseek(bd->in_fd, 0, SEEK_CUR ));
 
-// Search a block where opt_f is located
+    // Search a block where opt_f is located
     opt_from_pos = opt_from_bin_search(0, file_size, opt_from_time_t, bd, opt_f,
         dt_substr_len, first_dt_str_in_outbuf, dt_fmt);
                                        
@@ -219,27 +218,24 @@ int main(int argc, char *argv[])
         //        opt_from_pos + bd->cur_file_offset * 8);
     }
 
-// Save current relative position
+    // Save current relative position
     cur_rel_bz2_blk_pos = opt_from_pos;
 
     //exit(EXIT_SUCCESS);
 
-// Set first_dt_str_in_outbuf_time_t of the first bz2 block, where opt_f was
-// found, to opt_from_time_t 
+    // Set first_dt_str_in_outbuf_time_t of the first bz2 block, where opt_f
+    // was found, to opt_from_time_t 
     first_dt_str_in_outbuf_time_t = opt_from_time_t;
 
-    //printf("main(): first_dt_str_in_outbuf_time_t = %llu, opt_to_time_t = %llu\n",
-    //        first_dt_str_in_outbuf_time_t, opt_to_time_t);
-
-// Uncompress the first block, where opt_f was found, and all the next blocks
-// till the last one where first found datetime sting = opt_to
+    // Uncompress the first block, where opt_f was found, and all the next
+    // blocks till the last one where first found datetime string = opt_to
     while (first_dt_str_in_outbuf_time_t <= opt_to_time_t) {
         // Uncompress a block
 #if !DEBUG
 	    uncompress_blk(cur_rel_bz2_blk_pos, bd);
-	    //debug_print("block %llu\n", bd->cur_file_offset * 8 + cur_rel_bz2_blk_pos);
 #endif
-        debug_print("block %llu\n", bd->cur_file_offset * 8 + cur_rel_bz2_blk_pos);
+        debug_print("block %llu\n", bd->cur_file_offset * 8 + 
+            cur_rel_bz2_blk_pos);
 
         // If an ucompressed block is the last one, then break a cycle
         if (bd->cur_file_offset * 8 + cur_rel_bz2_blk_pos == last_blk_pos)
@@ -247,23 +243,25 @@ int main(int argc, char *argv[])
 
         // Move file offset to the byte where current bz2 block was found + 1 
         // (i.e. next block)
-	    bd->cur_file_offset = lseek_set(bd, bd->cur_file_offset + cur_rel_bz2_blk_pos / 8 + 1);
-	    //printf("main(): lseek(bd->in_fd, bd->cur_file_offset + cur_rel_bz2_blk_pos / 8 + 1, SEEK_SET) = %llu\n", bd->cur_file_offset);
+	    bd->cur_file_offset = lseek_set(bd, bd->cur_file_offset +
+            cur_rel_bz2_blk_pos / 8 + 1);
 
         // Search bit position of the next block
 	    cur_rel_bz2_blk_pos = search_start_bit_of_bz2_blk(bd);
 	    //printf("main(): next block position = %llu, bd->cur_file_offset = %llu\n",
         //        cur_rel_bz2_blk_pos, bd->cur_file_offset);
 
-        // Uncompress the block and find the first dt sting there
+        // Uncompress the block and find the first datetime sting there
 	    get_first_dt_str_from_bz2_blk(cur_rel_bz2_blk_pos, dt_substr_len, bd,
                                       first_dt_str_in_outbuf, dt_fmt);
 	    //printf("main(): first_dt_str_in_outbuf in the block %llu = %s\n", 
         //  bd->cur_file_offset * 8 + cur_rel_bz2_blk_pos, first_dt_str_in_outbuf);
 
         // Convert previously found diatetime string into epoch time format
-	    first_dt_str_in_outbuf_time_t = convert_dt_str_to_epoch(first_dt_str_in_outbuf, dt_fmt);
-	    //printf("main(): first_dt_str_in_outbuf_time_t = %d\n", first_dt_str_in_outbuf_time_t);
+	    first_dt_str_in_outbuf_time_t = 
+            convert_dt_str_to_epoch(first_dt_str_in_outbuf, dt_fmt);
+	    // printf("main(): first_dt_str_in_outbuf_time_t = %d\n",
+        //  first_dt_str_in_outbuf_time_t);
     }
 
     // Check if opt_to exists in a whole block
@@ -276,7 +274,7 @@ int main(int argc, char *argv[])
 
     //printf("%s(): is_dt_str_found = %d\n", __func__, is_dt_str_found);
 
-// Find the last block where opt_to exists
+    // Find the last block where opt_to exists
     while (is_dt_str_found) 
     {
         debug_print("opt_to value %s was found in the block %llu", 
@@ -322,7 +320,7 @@ void process_opts(int argc, char *argv[], const char **opt_f,
     };
 
     // Parse the options and assign its values to variables
-    while ( (getopt_res = getopt_long(argc, argv, "", long_options, NULL)) != -1 )
+    while ((getopt_res = getopt_long(argc, argv, "", long_options, NULL)) != -1)
     {
         //printf("opt = %c\n", opt);
         switch (getopt_res)
@@ -365,12 +363,14 @@ long long find_last_blk_pos(bunzip_data *bd)
     int backward_offset;
 
     // searching for the last bz2 block from file's end by backward_offset  
-    for (backward_offset = backward_offset_step; last_blk_pos == 0; backward_offset += backward_offset_step)
+    for (backward_offset = backward_offset_step; last_blk_pos == 0;
+        backward_offset += backward_offset_step)
     {
         bd->cur_file_offset = lseek(bd->in_fd, -backward_offset, SEEK_END);
         // search for the block
         last_blk_pos = search_start_bit_of_bz2_blk(bd);
-        //printf("%s: last block position = %llu\n", __func__, last_blk_pos + bd->cur_file_offset * 8);
+        //debuf_print("last block position = %llu\n", 
+        //    last_blk_pos + bd->cur_file_offset * 8);
     }
 
     return last_blk_pos;
@@ -378,8 +378,8 @@ long long find_last_blk_pos(bunzip_data *bd)
 
 
 unsigned long long opt_from_first_blk_search(unsigned long long opt_from_pos, 
-                                             bunzip_data *bd,
-                                             const char * opt_f)
+                                             bunzip_data        *bd,
+                                             const char         *opt_f)
 {
     long long prev_rel_bz2_blk_pos, cur_rel_bz2_blk_pos;
     long long prev_abs_bz2_blk_pos, cur_abs_bz2_blk_pos;
@@ -550,7 +550,8 @@ unsigned long opt_from_bin_search(off_t low,
 
 	    debug_print("block %jd", (intmax_t)(bd->cur_file_offset * 8 + mid_pos));
         
-        // Get the first dt string from current block and convert it to epoch time
+        // Get the first datetime string from current block and convert it to
+        // epoch time
 	    get_first_dt_str_from_bz2_blk(mid_pos, dt_length, bd,
                                       first_dt_str_in_outbuf, dt_fmt);
         debug_print("first_dt_str_in_outbuf = %s", first_dt_str_in_outbuf);
@@ -624,7 +625,8 @@ unsigned long opt_from_bin_search(off_t low,
 	        debug_print("opt_f (%s) == first_dt_str_in_outbuf (%s)", 
                     opt_f, first_dt_str_in_outbuf);
 
-            //printf("opt_from_bin_search: opt_f was found in the block with starting bit %llu\n\n", mid_pos + bd->cur_file_offset * 8);
+            // printf("opt_from_bin_search: opt_f was found in the block with 
+            // starting bit %llu\n\n", mid_pos + bd->cur_file_offset * 8);
             // to uncompress the block in which opt_f was found it's needed to
             // move lseek to the previous position
 
@@ -705,7 +707,7 @@ int uncompress_first_buf_of_blk(unsigned long pos, bunzip_data *bd, char *obuf)
     int gotcount = 0;
 
 
-    seek_bits( bd, pos );
+    seek_bits(bd, pos);
 
     /* Fill the decode buffer for the block */
     if (status = get_next_block( bd ))
@@ -745,7 +747,8 @@ int uncompress_first_buf_of_blk(unsigned long pos, bunzip_data *bd, char *obuf)
 }
 
 
-int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *two_last_outbufs)
+int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd,
+    char *two_last_outbufs)
 {
     int status;
     int gotcount, prev_gotcount, last_gotcount, totalcount;
@@ -759,12 +762,13 @@ int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *t
     prev_outbuf[BUFFER_SIZE] = '\0';
     last_outbuf[BUFFER_SIZE] = '\0';
 
-    seek_bits( bd, pos );
+    seek_bits(bd, pos);
 
     /* Fill the decode buffer for the block */
     if ((status = get_next_block( bd )))
     {
-        printf("%s: ERROR. get_next_block() returned %d, bunzip_errors[-status]\n", __func__, status);
+        error_print("get_next_block() returned %d, bunzip_errors[-status]\n",
+            __func__, status);
         exit(EXIT_FAILURE);
     }
 
@@ -793,24 +797,29 @@ int uncompress_last_2_buffers_of_blk(unsigned long pos, bunzip_data *bd, char *t
         }
 	    else if (gotcount == BUFFER_SIZE) 
         {
-            // If gotcount == BUFFER_SIZE then this is not the last buffer. So store it into prev_outbuf
+            // If gotcount == BUFFER_SIZE then this is not the last buffer.
+            // So store it into prev_outbuf
 	        memcpy (prev_outbuf, last_outbuf, BUFFER_SIZE);
 	        prev_gotcount = gotcount;
 	    }
 	    else if (gotcount > 0 && gotcount < BUFFER_SIZE) 
         {
             // if obuf was written not in full then this is the last buffer.
-	        // So store the content of prev_outbuf and last_outbuf into two_last_oubufs
+	        // So store the content of prev_outbuf and last_outbuf into 
+            // two_last_oubufs
 	        last_gotcount = gotcount;
-	        memcpy(&two_last_outbufs[0], prev_outbuf, sizeof(char) * prev_gotcount);
-	        memcpy(&two_last_outbufs[BUFFER_SIZE], last_outbuf, sizeof(char) * last_gotcount);
+	        memcpy(&two_last_outbufs[0], prev_outbuf, 
+                sizeof(char) * prev_gotcount);
+	        memcpy(&two_last_outbufs[BUFFER_SIZE], last_outbuf, 
+                sizeof(char) * last_gotcount);
             // Put null char after data end
 	        two_last_outbufs[prev_gotcount + last_gotcount] = '\0';
             break;
 	    }
 	    else if (gotcount == 0 && totalcount == 0)
         {
-	        // If the first read_bunzip() wrote 0 bytes into last_outbuf, exit with error.
+	        // If the first read_bunzip() wrote 0 bytes into last_outbuf, exit
+            // with error.
 	        status = gotcount;
 	        debug_print("read_bunzip() returned %d uncompressing the block %llu. %s",
                 gotcount, bd->cur_file_offset * 8 + pos, bunzip_errors[-status]);
@@ -913,21 +922,23 @@ get_first_dt_str_from_bz2_blk(  unsigned long   pos,
     //debug_print("pos = %u, bd->cur_file_offset = %lu, abs_pos = %lu\n", 
     //    pos, bd->cur_file_offset, bd->cur_file_offset * 8 + pos);
 
-// Clean first_dt_str_in_outbuf from the previous value
+    // Clean first_dt_str_in_outbuf from the previous value
     memset(first_dt_str_in_outbuf, 0, test_substr_len);
 
-// Get the first uncompressed obuf from a block
+    // Get the first uncompressed obuf from a block
     gotcount = uncompress_first_buf_of_blk(pos, bd, obuf);
 
-// Finish obuf with '\0' char
+    // Finish obuf with '\0' char
     obuf[gotcount] = '\0';
 
-// A string from obuf. We don't know beforehand its size, so set it a max
-// possible size (gotcount bytes) to prevent buffer overflow. +1 for null char
+    // A string from obuf. We don't know beforehand its size, so set it a max
+    // possible size (gotcount bytes) to prevent buffer overflow. +1 for null
+    // char
     char str[gotcount + 1];
 
-// As a buffer usually starts not from the beginning of a string but from
-// arbitrary char, search for the first newline char (beginning of the next string)
+    // As a buffer usually starts not from the beginning of a string but from
+    // arbitrary char, search for the first newline char (beginning of the
+    // next string)
     for (obuf_pos = 0; obuf_pos < gotcount; obuf_pos++) 
     {
         //printf("obuf[%d] = %c\n", obuf_pos, obuf[obuf_pos]);
@@ -935,7 +946,7 @@ get_first_dt_str_from_bz2_blk(  unsigned long   pos,
             break;
     }
 
-// Loop through obuf
+    // Loop through obuf
     while (obuf_pos < gotcount) 
     {
         // Get a string from obuf
@@ -1357,7 +1368,6 @@ char * get_str(char *buf, int *buf_pos, char *str)
 {
     int str_pos = 0;
 
-
     // Current char is the newline char. So go to the first char of a string.
     // (*buf_pos)   first dereference buf_pos pointer to get obuf_pos value
     // ++           and then increment that value 
@@ -1419,7 +1429,8 @@ bool is_dt_substr_in_str(  char * str, int str_len, char * test_substr,
         }
         else
         {
-            //printf("%s: first_dt_str_in_outbuf = %s\n", __func__, first_dt_str_in_outbuf);
+            //printf("%s: first_dt_str_in_outbuf = %s\n", 
+            //    __func__, first_dt_str_in_outbuf);
             return true;
         }
 
@@ -1428,8 +1439,9 @@ bool is_dt_substr_in_str(  char * str, int str_len, char * test_substr,
     return false;
 }
 
+
 void usage(char * program_name)
 {
-    printf("Usage: %s --from=\"date\" --to=\"date\" --file=/path/to/file.bz2\n", 
-            program_name);
+    printf("Usage: %s --from=\"datetime\" --to=\"datetime\""
+        " --file=/path/to/file.bz2\n", program_name);
 }
