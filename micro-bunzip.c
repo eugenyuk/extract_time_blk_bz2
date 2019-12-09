@@ -54,9 +54,7 @@ unsigned int get_bits(bunzip_data *bd, char bits_wanted)
         {
             if ((bd->inbufCount = read(bd->in_fd, bd->inbuf, IOBUF_SIZE)) <= 0)
                 longjmp(bd->jmpbuf, RETVAL_UNEXPECTED_INPUT_EOF);
-            // eugenyuk@gmail.com: meningless
-            //// james@jamestaylor.org: track position
-            //bd->position += bd->inbufCount;
+
             bd->inbufPos = 0;
         }
         /* Avoid 32-bit overflow (dump bit buffer to top of output) */
