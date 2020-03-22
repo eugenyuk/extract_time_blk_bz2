@@ -5,7 +5,7 @@ This tool is useful when you need to get a part of a huge log file which was com
 I've added a possibility to extract only that bz2 blocks, which contains a data between --from and --to timestamps in a log.
 
 
-### How to comile:
+### How to compile:
 `> make`
 
 
